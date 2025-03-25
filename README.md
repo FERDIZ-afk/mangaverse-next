@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# MangaVerse
 
-## Getting Started
+MangaVerse adalah platform baca manga online yang dibangun dengan Next.js 14 dan Prisma. Aplikasi ini menyediakan berbagai fitur seperti:
 
-First, run the development server:
+## Fitur
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 📚 Baca manga dengan tampilan yang nyaman
+- 👤 Sistem autentikasi pengguna
+- 💬 Sistem komentar dengan foto profil
+- 🔖 Bookmark manga favorit
+- 📱 Responsif di semua perangkat
+- 📖 Riwayat baca
+- 🌙 Mode gelap
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Teknologi
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+- Next.js 14 (App Router)
+- Prisma (SQLite)
+- NextAuth.js
+- TailwindCSS
+- Shadcn UI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Instalasi
 
-## Learn More
+1. Clone repositori:
+   \`\`\`bash
+   git clone https://github.com/yourusername/mangaverse.git
+   cd mangaverse
+   \`\`\`
 
-To learn more about Next.js, take a look at the following resources:
+2. Install dependensi:
+   \`\`\`bash
+   npm install
+   \`\`\`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Salin file environment:
+   \`\`\`bash
+   cp .env.example .env
+   \`\`\`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Sesuaikan variabel environment di file `.env`
 
-## Deploy on Vercel
+5. Setup database:
+   \`\`\`bash
+   npx prisma migrate dev
+   \`\`\`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+6. Jalankan aplikasi:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Struktur Proyek
+
+\`\`\`
+mangaverse/
+├── prisma/ # Schema dan migrasi database
+├── public/ # Aset statis
+├── src/
+│ ├── app/ # Route dan halaman
+│ ├── components/ # Komponen React
+│ └── lib/ # Utilitas dan konfigurasi
+\`\`\`
+
+## API Routes
+
+- `/api/auth/*` - Endpoint autentikasi
+- `/api/manga/*` - Endpoint manga dan chapter
+- `/api/comments/*` - Endpoint komentar
+- `/api/bookmarks/*` - Endpoint bookmark
+- `/api/history/*` - Endpoint riwayat baca
+
+## Kontribusi
+
+Kontribusi selalu diterima! Silakan buat pull request untuk perbaikan atau penambahan fitur.
+
+## Lisensi
+
+[MIT License](LICENSE)
