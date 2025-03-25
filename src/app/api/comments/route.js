@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import prisma from "@/lib/prisma";
+import { commentSchema } from "@/lib/validations/comment";
+import { safeParse } from "valibot";
 
 // GET: Mendapatkan komentar untuk manga tertentu
 export async function GET(request) {
@@ -62,15 +64,17 @@ export async function POST(request) {
 
     // Parse request body
     const body = await request.json();
-    const { content, mangaSlug, chapter } = body;
 
     // Validasi input
-    if (!content || !mangaSlug) {
+    const result = safeParse(commentSchema, body);
+    if (!result.success) {
       return NextResponse.json(
-        { error: "Konten dan manga slug diperlukan" },
+        { error: result.error.message },
         { status: 400 }
       );
     }
+
+    const { content, mangaSlug, chapter } = result.data;
 
     // Buat komentar baru
     const comment = await prisma.comment.create({
@@ -140,7 +144,7 @@ export async function DELETE(request) {
       );
     }
 
-    // Pastikan hanya pemilik yang bisa menghapus (atau admin jika diimplementasikan)
+    // Pastikan hanya pemilik yang bisa menghapus
     if (comment.userId !== session.user.id) {
       return NextResponse.json(
         { error: "Tidak diizinkan menghapus komentar orang lain" },

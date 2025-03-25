@@ -260,7 +260,7 @@ export default function ChapterPage({ params }) {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white dark-reader">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-wrap justify-between items-center mb-6">
@@ -308,9 +308,9 @@ export default function ChapterPage({ params }) {
         </div>
 
         {/* Chapter Reader */}
-        <div className="max-w-4xl mx-auto">
+        <div className="manga-reader-container">
           {chapterData.images.map((image, index) => (
-            <div key={index} className="mb-2 relative flex justify-center">
+            <div key={index} className="mb-4">
               <img
                 src={
                   failedImages[index]
@@ -322,10 +322,9 @@ export default function ChapterPage({ params }) {
                     : image
                 }
                 alt={`Page ${index + 1}`}
-                className="max-w-full object-contain"
+                className="manga-page"
                 loading="lazy"
                 onError={() => handleImageError(index)}
-                style={{ width: "100%", height: "auto", maxHeight: "100%" }}
               />
             </div>
           ))}

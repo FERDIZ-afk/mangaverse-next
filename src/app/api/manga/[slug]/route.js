@@ -1,45 +1,64 @@
+import { NextResponse } from "next/server";
+import { mangaSchema } from "@/lib/validations/manga";
+import { safeParse } from "valibot";
+
 export async function GET(request, { params }) {
+  let slug;
   try {
-    const { slug } = await params;
-    const url = `http://weeb-scraper.onrender.com/api/komikcast/detail/${slug}`;
+    // Pastikan params.slug tersedia (gunakan await)
+    const paramsData = await params;
+    if (!paramsData?.slug) {
+      return NextResponse.json(
+        { error: "Manga slug tidak ditemukan" },
+        { status: 400 }
+      );
+    }
 
-    console.log(`Fetching manga detail for slug: ${slug}`);
-    console.log(`URL: ${url}`);
+    slug = paramsData.slug;
+    console.log("Fetching manga with slug:", slug);
 
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
+    // URL asli yang digunakan sebelumnya
+    const apiUrl = `http://weeb-scraper.onrender.com/api/komikcast/detail/${slug}`;
+    console.log("Full URL:", apiUrl);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    const response = await fetch(apiUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
 
-      const text = await response.text();
+    console.log("API Response status:", response.status);
 
-      try {
-        const data = JSON.parse(text);
-        return Response.json(data);
-      } catch (jsonError) {
-        throw new Error(`JSON parsing error: ${jsonError.message}`);
-      }
-    } catch (fetchError) {
-      console.error(`API error: ${fetchError.message}. Using fallback data.`);
-
-      // Jika API tidak tersedia, gunakan data fallback yang dinamis berdasarkan slug
+    if (!response.ok) {
+      console.log("Using fallback data due to API error");
       const fallbackData = generateFallbackData(slug);
+      // Kembalikan dalam format yang sama dengan kode asli
+      return NextResponse.json({ data: fallbackData });
+    }
 
-      return Response.json({
-        data: fallbackData,
-      });
+    const rawData = await response.text();
+    if (!rawData || rawData.trim() === "") {
+      console.log("Empty response from API, using fallback data");
+      return NextResponse.json({ data: generateFallbackData(slug) });
+    }
+
+    let data;
+    try {
+      data = JSON.parse(rawData);
+      console.log("API response parsed successfully");
+      return NextResponse.json(data);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      return NextResponse.json({ data: generateFallbackData(slug) });
     }
   } catch (error) {
-    console.error("Error proxying request:", error);
-    return Response.json(
+    console.error("Error in manga API route:", error);
+    if (slug) {
+      return NextResponse.json({ data: generateFallbackData(slug) });
+    }
+    return NextResponse.json(
       { error: `Failed to fetch manga details: ${error.message}` },
       { status: 500 }
     );
