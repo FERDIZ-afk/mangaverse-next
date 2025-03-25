@@ -1,103 +1,182 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Button,
+  Badge,
+  Input,
+} from "@/components/ui/";
+import { FilterIcon, StarIcon, BookOpenIcon, SearchIcon } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
-export default function Home() {
+export default function MangaVerse() {
+  const [komiks, setKomiks] = useState([]);
+  const [filteredKomiks, setFilteredKomiks] = useState([]);
+  const [nextPage, setNextPage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchKomiks = async (url) => {
+    setLoading(true);
+    try {
+      // Menggunakan API route lokal sebagai proxy
+      const apiUrl = url
+        ? `/api/komiks?url=${encodeURIComponent(url)}`
+        : "/api/komiks";
+
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      setKomiks((prevKomiks) =>
+        url ? [...prevKomiks, ...data.data] : data.data
+      );
+      setNextPage(data.next_page);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching komiks:", error);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKomiks();
+  }, []);
+
+  useEffect(() => {
+    // Filter logic
+    let result = komiks;
+
+    if (typeFilter !== "All") {
+      result = result.filter((komik) => komik.type === typeFilter);
+    }
+
+    if (searchQuery) {
+      result = result.filter((komik) =>
+        komik.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredKomiks(result);
+  }, [komiks, typeFilter, searchQuery]);
+
+  const loadMoreKomiks = () => {
+    if (nextPage) {
+      fetchKomiks(nextPage);
+    }
+  };
+
+  const getColorForRating = (rating) => {
+    const parsedRating = parseFloat(rating);
+    if (parsedRating >= 8) return "bg-green-500";
+    if (parsedRating >= 7) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
+      <Navbar />
+      <div className="container mx-auto px-4 py-8">
+        <header className="mb-8">
+          <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+            MangaVerse
+          </h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <div className="flex space-x-4 mb-6">
+            <div className="flex-grow relative">
+              <Input
+                icon={<SearchIcon className="text-gray-500" />}
+                placeholder="Search manga..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+
+            <Select onValueChange={setTypeFilter} value={typeFilter}>
+              <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700">
+                <SelectValue placeholder="Filter Type">
+                  <div className="flex items-center">
+                    <FilterIcon className="mr-2 h-4 w-4" />
+                    {typeFilter}
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Types</SelectItem>
+                <SelectItem value="Manga">Manga</SelectItem>
+                <SelectItem value="Manhwa">Manhwa</SelectItem>
+                <SelectItem value="Manhua">Manhua</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {filteredKomiks.map((komik) => (
+            <Link href={`/manga/${komik.param}`} key={komik.param}>
+              <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform cursor-pointer h-full">
+                <div className="relative">
+                  <Image
+                    src={komik.thumbnail}
+                    alt={komik.title}
+                    width={300}
+                    height={400}
+                    className="w-full h-64 object-cover rounded-t-lg"
+                  />
+                  <Badge
+                    className={`absolute top-2 right-2 ${getColorForRating(
+                      komik.rating
+                    )}`}
+                  >
+                    <StarIcon className="h-4 w-4 mr-1" />
+                    {komik.rating}
+                  </Badge>
+                </div>
+                <CardContent className="p-3">
+                  <h3 className="text-sm font-bold truncate text-white mb-1">
+                    {komik.title}
+                  </h3>
+                  <div className="flex justify-between items-center">
+                    <Badge variant="secondary" className="bg-gray-700">
+                      <BookOpenIcon className="h-3 w-3 mr-1" />
+                      {komik.type}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {loading && (
+          <div className="text-center my-8">
+            <p className="text-xl animate-pulse">Loading more manga...</p>
+          </div>
+        )}
+
+        {nextPage && (
+          <div className="text-center mt-8">
+            <Button
+              onClick={loadMoreKomiks}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            >
+              Load More Manga
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
