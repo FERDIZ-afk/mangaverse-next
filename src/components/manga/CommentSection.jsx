@@ -52,16 +52,25 @@ export default function CommentSection({ mangaSlug, chapter = null }) {
     setError("");
 
     try {
+      // Buat objek data komentar
+      const commentData = {
+        content: commentText.trim(),
+        mangaSlug: mangaSlug,
+      };
+
+      // Hanya tambahkan chapter jika tidak null dan tidak empty string
+      if (chapter) {
+        commentData.chapter = chapter;
+      }
+
+      console.log("Sending comment data:", commentData);
+
       const response = await fetch("/api/comments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          content: commentText,
-          mangaSlug,
-          chapter,
-        }),
+        body: JSON.stringify(commentData),
       });
 
       const data = await response.json();

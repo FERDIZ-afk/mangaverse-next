@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,8 @@ import BookmarkButton from "@/components/manga/BookmarkButton";
 
 export default function MangaDetailPage({ params }) {
   const router = useRouter();
-  const { slug } = params;
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
   const [manga, setManga] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

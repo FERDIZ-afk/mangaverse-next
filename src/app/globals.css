@@ -1,69 +1,142 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import "tailwindcss";
 
-/* Global styles */
 :root {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-
-  --primary: 285 90% 60%;
-  --primary-foreground: 0 0% 98%;
-
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 285 90% 60%;
-
-  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
   }
 }
 
-/* Custom reader styles */
-.manga-reader-container {
-  max-width: 1000px;
-  margin: 0 auto;
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-.manga-page {
-  display: block;
-  margin: 0 auto 16px;
-  max-width: 100%;
-  height: auto;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+/* Untuk menghilangkan teks dan informasi inspeksi yang tidak diinginkan pada gambar */
+img.w-full.h-auto {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
 }
 
-/* Dark mode reader */
-.dark-reader {
-  background-color: #000;
-  color: #fff;
+/* Menghilangkan spacing pada elemen gambar */
+.flex-col.items-center {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
 }
 
-.dark-reader .manga-page {
-  filter: brightness(0.95) contrast(1.05);
+/* Menghilangkan jarak antar gambar */
+.flex-col.items-center > div {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+}
+
+/* Styling untuk card dan UI elements */
+.bg-gradient-to-br {
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+/* Animasi untuk buttons */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Meningkatkan tampilan focus dan hover */
+button:focus,
+a:focus {
+  outline: 2px solid rgba(168, 85, 247, 0.5);
+  outline-offset: 2px;
+}
+
+/* Glass morphism effect */
+.backdrop-blur-sm {
+  backdrop-filter: blur(8px);
+}
+
+/* Improved shadows */
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Membuat tampilan loading lebih halus */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 30, 30, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #9333ea, #3b82f6);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #a855f7, #60a5fa);
+}
+
+/* Progress bar animation */
+@keyframes progressAnimation {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.h-full.bg-gradient-to-r {
+  animation: progressAnimation 0.3s ease-out;
 }

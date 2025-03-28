@@ -64,17 +64,41 @@ export async function POST(request) {
 
     // Parse request body
     const body = await request.json();
+    console.log("Received comment data:", body);
 
     // Validasi input
     const result = safeParse(commentSchema, body);
+
     if (!result.success) {
+      // Mengakses result.error dengan aman dan menyediakan pesan default jika tidak ada
+      const errorMessage =
+        result.error && result.error.message
+          ? result.error.message
+          : "Data komentar tidak valid";
+
+      console.log("Validation failed:", result.error);
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
+    }
+
+    // Memastikan result.data ada sebelum melakukan destructuring
+    if (!result.output) {
+      console.log("Validation succeeded but no output data");
       return NextResponse.json(
-        { error: result.error.message },
+        { error: "Data komentar tidak valid" },
         { status: 400 }
       );
     }
 
-    const { content, mangaSlug, chapter } = result.data;
+    const { content, mangaSlug, chapter } = result.output;
+
+    // Validasi tambahan
+    if (!content || !mangaSlug) {
+      console.log("Missing required fields even after validation");
+      return NextResponse.json(
+        { error: "Content dan mangaSlug diperlukan" },
+        { status: 400 }
+      );
+    }
 
     // Buat komentar baru
     const comment = await prisma.comment.create({

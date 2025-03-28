@@ -1,97 +1,96 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/";
-
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ArrowLeftIcon,
-  HomeIcon,
-  BookOpenIcon,
-} from "lucide-react";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  Bookmark,
+  Share2,
+  Heart,
+} from "lucide-react";
 
 export default function ChapterPage({ params }) {
-  const router = useRouter();
+  // Gunakan use() untuk membuka Promise params
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
+
   const { data: session } = useSession();
-  const [chapterData, setChapterData] = useState(null);
+  const router = useRouter();
+  const [chapter, setChapter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [failedImages, setFailedImages] = useState({});
-
-  const slug = params.slug;
-
-  // Ekstrak mangaSlug dan chapterSlug dari path parameter
-  const extractSlugParts = () => {
-    // Contoh: bouken-ni-iku-fuku-ga-nai-chapter-59-bahasa-indonesia
-    const parts = slug.split("-chapter-");
-    if (parts.length === 2) {
-      const mangaSlug = parts[0]; // bouken-ni-iku-fuku-ga-nai
-      const chapterPart = parts[1]; // 59-bahasa-indonesia
-      return { mangaSlug, chapterSlug: `chapter-${chapterPart}` };
-    }
-    return { mangaSlug: slug, chapterSlug: "" };
-  };
-
-  const { mangaSlug, chapterSlug } = extractSlugParts();
-
-  // URL API untuk mendapatkan data chapter
-  const fetchChapterData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log(
-        `Fetching chapter data for manga: ${mangaSlug}, chapter: ${chapterSlug}`
-      );
-      const response = await fetch(`/api/manga/${mangaSlug}/${chapterSlug}`);
-
-      if (!response.ok) {
-        throw new Error(
-          `Terjadi kesalahan saat mengambil data chapter (${response.status})`
-        );
-      }
-
-      const data = await response.json();
-      console.log("Chapter data:", data);
-
-      if (!data || !data.images || !Array.isArray(data.images)) {
-        throw new Error("Format data chapter tidak valid");
-      }
-
-      setChapterData(data);
-
-      // Simpan ke riwayat baca jika user logged in
-      if (session?.user) {
-        try {
-          recordReadingHistory(data);
-        } catch (historyError) {
-          console.error("Error recording reading history:", historyError);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching chapter data:", error);
-      setError("Gagal memuat chapter. Silakan coba lagi nanti.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
 
   useEffect(() => {
-    if (slug) {
-      fetchChapterData();
+    async function fetchChapterData() {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/manga/chapter/${slug}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Gagal mengambil data chapter");
+        }
+
+        console.log("Chapter data received:", data);
+
+        // Periksa apakah data memiliki gambar
+        if (
+          !data ||
+          !data.images ||
+          !Array.isArray(data.images) ||
+          data.images.length === 0
+        ) {
+          console.error("Data chapter tidak memiliki gambar yang valid:", data);
+          setError("Data chapter tidak memiliki gambar yang valid");
+          setLoading(false);
+          return;
+        }
+
+        setChapter(data);
+
+        // Jika user login, catat riwayat baca (tetapi jangan biarkan error mempengaruhi tampilan)
+        if (session?.user) {
+          try {
+            recordReadingHistory(data);
+          } catch (historyError) {
+            console.error("Error recording reading history:", historyError);
+            // Lanjutkan menampilkan chapter meskipun ada error riwayat baca
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching chapter data:", err);
+        setError("Gagal memuat chapter. Silakan coba lagi nanti.");
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [slug]);
+
+    fetchChapterData();
+
+    // Menambahkan event listener untuk menghitung progress membaca
+    const handleScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+
+      const scrolled = (scrollTop / (scrollHeight - clientHeight)) * 100;
+      setReadingProgress(Math.min(Math.round(scrolled), 100));
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [slug, session]);
 
   const recordReadingHistory = async (chapterData) => {
     try {
@@ -102,7 +101,7 @@ export default function ChapterPage({ params }) {
       }
 
       // Pastikan data yang diperlukan tersedia
-      if (!chapterData || !mangaSlug) {
+      if (!chapterData || !chapterData.manga_param) {
         console.error("Data chapter tidak valid untuk riwayat baca");
         return;
       }
@@ -114,7 +113,7 @@ export default function ChapterPage({ params }) {
       console.log("Mencatat riwayat baca untuk:", {
         mangaTitle,
         chapterSlug: slug,
-        mangaParam: mangaSlug,
+        mangaParam: chapterData.manga_param,
       });
 
       // Kirim data ke API untuk mendapatkan entri riwayat terformat
@@ -124,7 +123,7 @@ export default function ChapterPage({ params }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          mangaSlug: mangaSlug,
+          mangaSlug: chapterData.manga_param,
           mangaTitle: mangaTitle,
           chapterSlug: slug,
           chapterTitle: `Chapter ${chapterData.chapter_number || "?"}`,
@@ -135,48 +134,90 @@ export default function ChapterPage({ params }) {
       console.log("Response API history:", result);
 
       if (result.success && result.data) {
-        // Simpan ke localStorage
-        let historyData = [];
         try {
-          const localHistory = localStorage.getItem("mangaReadingHistory");
-          historyData = localHistory ? JSON.parse(localHistory) : [];
-          if (!Array.isArray(historyData)) historyData = [];
-        } catch (error) {
-          console.error("Error parsing history data:", error);
+          // Simpan langsung ke localStorage
+          // Baca data saat ini dari localStorage
+          let historyData = [];
+          try {
+            const localHistory = localStorage.getItem("mangaReadingHistory");
+            console.log("Data riwayat saat ini:", localHistory);
+            historyData = localHistory ? JSON.parse(localHistory) : [];
+
+            // Validasi data adalah array
+            if (!Array.isArray(historyData)) {
+              console.warn("Data riwayat bukan array, mereset ke array kosong");
+              historyData = [];
+            }
+          } catch (parseError) {
+            console.error("Error parsing data riwayat:", parseError);
+            historyData = [];
+          }
+
+          // Hapus entri yang sama jika sudah ada (berdasarkan mangaSlug dan chapterSlug)
+          const oldLength = historyData.length;
+          historyData = historyData.filter(
+            (item) =>
+              !(
+                item.mangaSlug === result.data.mangaSlug &&
+                item.chapterSlug === result.data.chapterSlug
+              )
+          );
+
+          if (oldLength !== historyData.length) {
+            console.log("Menghapus entri duplikat dari riwayat");
+          }
+
+          // Tambahkan entri baru
+          historyData.push(result.data);
+          console.log("Entri baru ditambahkan:", result.data);
+
+          // Batasi jumlah riwayat yang disimpan (misalnya 100 item terakhir)
+          if (historyData.length > 100) {
+            historyData = historyData.slice(-100);
+            console.log("Membatasi riwayat ke 100 item terakhir");
+          }
+
+          // Simpan kembali ke localStorage
+          const dataToSave = JSON.stringify(historyData);
+          console.log(
+            "Menyimpan data ke localStorage:",
+            dataToSave.substring(0, 100) + "..."
+          );
+          localStorage.setItem("mangaReadingHistory", dataToSave);
+
+          // Verifikasi data tersimpan
+          const savedData = localStorage.getItem("mangaReadingHistory");
+          if (savedData) {
+            console.log(
+              "Data berhasil disimpan ke localStorage, panjang:",
+              savedData.length
+            );
+            // Simpan juga ke sessionStorage sebagai backup
+            sessionStorage.setItem("mangaReadingHistory_backup", dataToSave);
+          } else {
+            console.error("Gagal menyimpan data ke localStorage");
+          }
+        } catch (storageError) {
+          console.error("Error saat menyimpan ke localStorage:", storageError);
+          // Coba simpan ke sessionStorage sebagai fallback
+          try {
+            sessionStorage.setItem(
+              "mangaReadingHistory_fallback",
+              JSON.stringify([result.data])
+            );
+            console.log("Data disimpan ke sessionStorage sebagai fallback");
+          } catch (sessionError) {
+            console.error(
+              "Juga gagal menyimpan ke sessionStorage:",
+              sessionError
+            );
+          }
         }
-
-        // Hapus entri yang sama jika sudah ada
-        historyData = historyData.filter(
-          (item) =>
-            !(
-              item.mangaSlug === result.data.mangaSlug &&
-              item.chapterSlug === result.data.chapterSlug
-            )
-        );
-
-        // Tambahkan entri baru
-        historyData.push(result.data);
-
-        // Batasi jumlah riwayat
-        if (historyData.length > 100) {
-          historyData = historyData.slice(-100);
-        }
-
-        // Simpan kembali ke localStorage
-        localStorage.setItem(
-          "mangaReadingHistory",
-          JSON.stringify(historyData)
-        );
       }
     } catch (error) {
       console.error("Failed to record reading history:", error);
+      // Jangan lempar error - biarkan pengguna tetap bisa membaca chapter
     }
-  };
-
-  const navigateToChapter = (chapterPath) => {
-    if (!chapterPath) return;
-
-    router.push(`/manga/chapter/${chapterPath}`);
   };
 
   // Handler untuk error loading gambar
@@ -189,6 +230,7 @@ export default function ChapterPage({ params }) {
 
   // Fungsi untuk menghasilkan fallback URL gambar
   const generatePlaceholderImageUrl = (index, title, chapterNumber) => {
+    // Buat gambar SVG langsung sebagai data URL
     const svgContent = `<svg width="800" height="1200" xmlns="http://www.w3.org/2000/svg">
       <rect width="800" height="1200" fill="#333333"/>
       <text x="400" y="200" font-family="Arial" font-size="36" fill="#FFFFFF" text-anchor="middle">Image Failed to Load</text>
@@ -203,13 +245,24 @@ export default function ChapterPage({ params }) {
     return `data:image/svg+xml;base64,${base64Image}`;
   };
 
+  // Fungsi untuk bookmark dan like
+  const toggleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
+    // Implementasi penyimpanan bookmark
+  };
+
+  const toggleLike = () => {
+    setIsLiked(!isLiked);
+    // Implementasi penyimpanan like
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
         <Navbar />
-        <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center">
+        <div className="flex flex-col justify-center items-center min-h-[80vh]">
           <div className="w-16 h-16 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-xl">Memuat chapter...</p>
+          <p className="text-purple-300 animate-pulse">Memuat chapter...</p>
         </div>
       </div>
     );
@@ -219,135 +272,207 @@ export default function ChapterPage({ params }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
         <Navbar />
-        <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center">
-          <p className="text-xl text-red-400 mb-4">{error}</p>
-          <div className="flex gap-4">
-            <Button
-              onClick={() => router.push(`/manga/${mangaSlug}`)}
-              className="bg-gray-700 hover:bg-gray-600"
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-red-500 bg-opacity-20 text-white p-8 rounded-lg shadow-lg backdrop-blur-sm border border-red-500/30">
+            <h2 className="text-xl font-bold mb-4">Error</h2>
+            <p className="mb-6">{error}</p>
+            <Link
+              href="/"
+              className="inline-block bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
             >
-              <ArrowLeftIcon className="mr-2 h-4 w-4" />
-              Kembali ke Manga
-            </Button>
-            <Button
-              onClick={fetchChapterData}
-              className="bg-purple-600 hover:bg-purple-500"
-            >
-              Coba Lagi
-            </Button>
+              Kembali ke Beranda
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!chapterData) {
+  if (!chapter || !chapter.images || chapter.images.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
         <Navbar />
-        <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center">
-          <p className="text-xl text-red-400 mb-4">Chapter tidak ditemukan</p>
-          <Button
-            onClick={() => router.push(`/manga/${mangaSlug}`)}
-            className="bg-gray-700 hover:bg-gray-600"
-          >
-            <ArrowLeftIcon className="mr-2 h-4 w-4" />
-            Kembali ke Manga
-          </Button>
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-yellow-500 bg-opacity-20 text-white p-8 rounded-lg shadow-lg backdrop-blur-sm border border-yellow-500/30">
+            <h2 className="text-xl font-bold mb-4">Tidak Ada Konten</h2>
+            <p className="mb-6">Tidak ada gambar tersedia untuk chapter ini.</p>
+            <Link
+              href="/"
+              className="inline-block bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-black text-white dark-reader">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-wrap justify-between items-center mb-6">
-          <div className="flex gap-2 mb-4 md:mb-0">
-            <Button
-              onClick={() => router.push("/")}
-              variant="outline"
-              className="bg-gray-800 border-gray-700 hover:bg-gray-700"
-            >
-              <HomeIcon className="h-4 w-4 mr-2" />
-              Beranda
-            </Button>
-            <Button
-              onClick={() => router.push(`/manga/${mangaSlug}`)}
-              variant="outline"
-              className="bg-gray-800 border-gray-700 hover:bg-gray-700"
-            >
-              <BookOpenIcon className="h-4 w-4 mr-2" />
-              Detail Manga
-            </Button>
-          </div>
+  const mangaTitle = chapter.title.split(" Chapter")[0];
+  const chapterNum = chapter.chapter_number;
 
-          <h1 className="text-xl font-bold text-center w-full md:w-auto mb-4 md:mb-0">
-            {chapterData.title}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
+      <Navbar />
+
+      {/* Reading Progress Bar */}
+      <div className="fixed top-0 left-0 w-full h-1 z-50">
+        <div
+          className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+          style={{ width: `${readingProgress}%` }}
+        ></div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+            {mangaTitle} - Chapter {chapterNum}
           </h1>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={() => navigateToChapter(chapterData.prev_chapter)}
-              disabled={!chapterData.prev_chapter}
-              className="bg-gray-800 border-gray-700 hover:bg-gray-700 disabled:opacity-50"
-            >
-              <ChevronLeftIcon className="h-4 w-4 mr-2" />
-              Prev
-            </Button>
-            <Button
-              onClick={() => navigateToChapter(chapterData.next_chapter)}
-              disabled={!chapterData.next_chapter}
-              className="bg-gray-800 border-gray-700 hover:bg-gray-700 disabled:opacity-50"
-            >
-              Next
-              <ChevronRightIcon className="h-4 w-4 ml-2" />
-            </Button>
+          <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl p-4 mb-8 shadow-xl border border-gray-700/50">
+            <div className="flex flex-wrap md:flex-nowrap justify-between items-center gap-4">
+              <Link
+                href={`/manga/${chapter.manga_param}`}
+                className="text-purple-400 hover:text-purple-300 flex items-center transition-colors duration-300"
+              >
+                <ArrowLeft size={20} className="mr-2" />
+                <span>Detail Manga</span>
+              </Link>
+
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={toggleLike}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full transition-all duration-300 ${
+                    isLiked
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-gray-700/50 text-gray-400 hover:bg-gray-700"
+                  }`}
+                >
+                  <Heart size={16} className={isLiked ? "fill-red-400" : ""} />
+                  <span className="text-sm">Like</span>
+                </button>
+
+                <button
+                  onClick={toggleBookmark}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full transition-all duration-300 ${
+                    isBookmarked
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "bg-gray-700/50 text-gray-400 hover:bg-gray-700"
+                  }`}
+                >
+                  <Bookmark
+                    size={16}
+                    className={isBookmarked ? "fill-blue-400" : ""}
+                  />
+                  <span className="text-sm">Bookmark</span>
+                </button>
+
+                <button className="flex items-center gap-1 px-3 py-1 rounded-full bg-gray-700/50 text-gray-400 hover:bg-gray-700 transition-all duration-300">
+                  <Share2 size={16} />
+                  <span className="text-sm">Share</span>
+                </button>
+              </div>
+
+              <div className="flex space-x-3 w-full md:w-auto">
+                {chapter.prev_chapter && (
+                  <Link
+                    href={`/manga/chapter/${chapter.prev_chapter}`}
+                    className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center transition-all duration-300 shadow-md hover:shadow-lg flex-1 md:flex-auto justify-center md:justify-start"
+                  >
+                    <ChevronLeft size={18} className="mr-1" />
+                    <span className="hidden md:inline">Chapter Sebelumnya</span>
+                    <span className="md:hidden">Prev</span>
+                  </Link>
+                )}
+
+                {chapter.next_chapter && (
+                  <Link
+                    href={`/manga/chapter/${chapter.next_chapter}`}
+                    className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 px-4 py-2 rounded-lg flex items-center transition-all duration-300 shadow-md hover:shadow-lg flex-1 md:flex-auto justify-center md:justify-start"
+                  >
+                    <span className="hidden md:inline">
+                      Chapter Selanjutnya
+                    </span>
+                    <span className="md:hidden">Next</span>
+                    <ChevronRight size={18} className="ml-1" />
+                  </Link>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Chapter Reader */}
-        <div className="manga-reader-container">
-          {chapterData.images.map((image, index) => (
-            <div key={index} className="mb-4">
-              <img
-                src={
-                  failedImages[index]
-                    ? generatePlaceholderImageUrl(
-                        index,
-                        chapterData.title,
-                        chapterData.chapter_number || "?"
-                      )
-                    : image
-                }
-                alt={`Page ${index + 1}`}
-                className="manga-page"
-                loading="lazy"
-                onError={() => handleImageError(index)}
-              />
-            </div>
-          ))}
+        <div className="mx-auto max-w-3xl mb-8">
+          <div className="flex flex-col items-center">
+            {chapter.images.map((imageUrl, index) => (
+              <div key={index} className="w-full">
+                <Image
+                  src={
+                    failedImages[index]
+                      ? generatePlaceholderImageUrl(
+                          index,
+                          mangaTitle,
+                          chapterNum
+                        )
+                      : imageUrl
+                  }
+                  alt={`Halaman ${index + 1}`}
+                  width={800}
+                  height={1200}
+                  className="w-full h-auto"
+                  priority={index < 3} // Prioritaskan 3 gambar pertama
+                  onError={() => handleImageError(index)}
+                  blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjEyMDAiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzM0MTU1Ii8+PC9zdmc+"
+                  placeholder="blur"
+                  unoptimized={true}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Navigation Bottom */}
-        <div className="flex justify-center gap-2 mt-8 mb-12">
-          <Button
-            onClick={() => navigateToChapter(chapterData.prev_chapter)}
-            disabled={!chapterData.prev_chapter}
-            className="bg-gray-800 border-gray-700 hover:bg-gray-700 disabled:opacity-50"
-          >
-            <ChevronLeftIcon className="h-4 w-4 mr-2" />
-            Chapter Sebelumnya
-          </Button>
-          <Button
-            onClick={() => navigateToChapter(chapterData.next_chapter)}
-            disabled={!chapterData.next_chapter}
-            className="bg-gray-800 border-gray-700 hover:bg-gray-700 disabled:opacity-50"
-          >
-            Chapter Selanjutnya
-            <ChevronRightIcon className="h-4 w-4 ml-2" />
-          </Button>
+        <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl p-4 mb-8 shadow-xl border border-gray-700/50">
+          <div className="flex flex-wrap md:flex-nowrap justify-between items-center gap-4">
+            {chapter.prev_chapter && (
+              <Link
+                href={`/manga/chapter/${chapter.prev_chapter}`}
+                className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center transition-all duration-300 shadow-md hover:shadow-lg flex-1 md:flex-auto justify-center md:justify-start"
+              >
+                <ChevronLeft size={18} className="mr-1" />
+                <span className="hidden md:inline">Chapter Sebelumnya</span>
+                <span className="md:hidden">Prev</span>
+              </Link>
+            )}
+
+            <Link
+              href={`/manga/${chapter.manga_param}`}
+              className="text-purple-400 hover:text-purple-300 flex items-center transition-colors duration-300"
+            >
+              <ArrowLeft size={20} className="mr-2" />
+              <span>Detail Manga</span>
+            </Link>
+
+            {chapter.next_chapter ? (
+              <Link
+                href={`/manga/chapter/${chapter.next_chapter}`}
+                className="bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 px-4 py-2 rounded-lg flex items-center transition-all duration-300 shadow-md hover:shadow-lg flex-1 md:flex-auto justify-center md:justify-start"
+              >
+                <span className="hidden md:inline">Chapter Selanjutnya</span>
+                <span className="md:hidden">Next</span>
+                <ChevronRight size={18} className="ml-1" />
+              </Link>
+            ) : (
+              <div className="ml-auto flex-1 md:flex-auto text-right">
+                <Link
+                  href={`/manga/${chapter.manga_param}`}
+                  className="inline-block bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 px-4 py-2 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
+                >
+                  Kembali ke Detail Manga
+                  <ChevronRight size={18} className="ml-1 inline" />
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
