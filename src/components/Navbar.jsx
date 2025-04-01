@@ -126,7 +126,7 @@ export default function Navbar() {
             </button>
 
             <Link
-              href="/bookmark"
+              href="/bookmarks"
               className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors"
               aria-label="Bookmarks"
             >
@@ -285,7 +285,7 @@ export default function Navbar() {
 
             <div className="pt-2 pb-1 border-t border-gray-700">
               <Link
-                href="/bookmark"
+                href="/bookmarks"
                 className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700"
                 onClick={() => setIsMenuOpen(false)}
               >

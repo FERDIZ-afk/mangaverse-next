@@ -121,7 +121,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/bookmark"
+                  href="/bookmarks"
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   Bookmark
