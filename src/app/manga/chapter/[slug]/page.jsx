@@ -259,7 +259,7 @@ export default function ChapterPage({ params }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="flex flex-col justify-center items-center min-h-[80vh]">
           <div className="w-16 h-16 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-purple-300 animate-pulse">Memuat chapter...</p>
@@ -271,7 +271,7 @@ export default function ChapterPage({ params }) {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="container mx-auto px-4 py-8">
           <div className="bg-red-500 bg-opacity-20 text-white p-8 rounded-lg shadow-lg backdrop-blur-sm border border-red-500/30">
             <h2 className="text-xl font-bold mb-4">Error</h2>
@@ -291,7 +291,7 @@ export default function ChapterPage({ params }) {
   if (!chapter || !chapter.images || chapter.images.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="container mx-auto px-4 py-8">
           <div className="bg-yellow-500 bg-opacity-20 text-white p-8 rounded-lg shadow-lg backdrop-blur-sm border border-yellow-500/30">
             <h2 className="text-xl font-bold mb-4">Tidak Ada Konten</h2>
@@ -313,7 +313,7 @@ export default function ChapterPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      <Navbar />
+      {/* <Navbar /> */}
 
       {/* Reading Progress Bar */}
       <div className="fixed top-0 left-0 w-full h-1 z-50">

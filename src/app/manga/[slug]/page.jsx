@@ -84,7 +84,7 @@ export default function MangaDetailPage({ params }) {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div
           className="container mx-auto px-4 py-8 flex flex-col items-center justify-center text-center"
           style={{ minHeight: "60vh" }}
@@ -117,7 +117,7 @@ export default function MangaDetailPage({ params }) {
   if (!manga) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div
           className="container mx-auto px-4 py-8 flex flex-col items-center justify-center"
           style={{ minHeight: "60vh" }}
@@ -139,7 +139,7 @@ export default function MangaDetailPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <Button
@@ -229,7 +229,11 @@ export default function MangaDetailPage({ params }) {
               <p className="text-gray-400">{manga.synopsis}</p>
             </div>
 
-            <Card className="bg-gray-800 border-gray-700">
+            <div className="mb-6">
+              <ChapterList chapters={manga.chapters || []} mangaSlug={slug} />
+            </div>
+
+            {/* <Card className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <CardTitle className="text-white">
                   <div className="flex items-center justify-between">
@@ -242,11 +246,16 @@ export default function MangaDetailPage({ params }) {
                     </span>
                   </div>
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChapterList chapters={manga.chapters || []} mangaSlug={slug} />
-              </CardContent>
-            </Card>
+              </CardHeader> */}
+            {/* <CardContent>
+                <ChapterList
+                  chapters={manga.chapters || []}
+                  mangaSlug={slug}
+                  showPagination={true}
+                  itemsPerPage={50}
+                />
+              </CardContent> */}
+            {/* </Card> */}
           </div>
         </div>
 
@@ -259,7 +268,7 @@ export default function MangaDetailPage({ params }) {
 function LoadingSkeleton() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <Skeleton className="h-10 w-40 bg-gray-700 mb-4" />
 
