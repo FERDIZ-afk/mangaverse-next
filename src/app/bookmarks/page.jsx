@@ -59,7 +59,7 @@ export default function BookmarksPage() {
   if (status === "loading" || (status === "authenticated" && isLoading)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-        <Navbar />
+        {/* <Navbar /> */}
         <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[calc(100vh-80px)]">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -77,7 +77,7 @@ export default function BookmarksPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -103,11 +103,11 @@ export default function BookmarksPage() {
               Belum ada bookmark
             </h2>
             <p className="text-gray-400 mb-6">
-              Bookmark manga favorit Anda untuk akses cepat.
+              Bookmark Komik favorit Anda untuk akses cepat.
             </p>
             <Link href="/">
               <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
-                Jelajahi Manga
+                Jelajahi Komik
               </Button>
             </Link>
           </div>
