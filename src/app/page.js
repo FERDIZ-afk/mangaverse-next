@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import FilterDropdown from "@/components/FilterDropdown";
 import {
   Card,
   CardContent,
@@ -27,6 +28,7 @@ export default function MangaVerse() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState("all");
 
   const fetchKomiks = async (url) => {
     setLoading(true);
@@ -53,6 +55,20 @@ export default function MangaVerse() {
   useEffect(() => {
     fetchKomiks();
   }, []);
+
+  const handleTypeChange = (type) => {
+    setSelectedType(type);
+
+    if (type === "all") {
+      setTypeFilter("All");
+    } else if (type === "manga") {
+      setTypeFilter("Manga");
+    } else if (type === "manhwa") {
+      setTypeFilter("Manhwa");
+    } else if (type === "manhua") {
+      setTypeFilter("Manhua");
+    }
+  };
 
   useEffect(() => {
     // Filter logic
@@ -86,14 +102,17 @@ export default function MangaVerse() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      <Navbar />
+      {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
           <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
             MangaVerse
           </h1>
+          <p className="text-center text-gray-400 mb-6">
+            Website masih dalam tahap pengembangan
+          </p>
 
-          <div className="flex space-x-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-grow relative">
               <Input
                 icon={<SearchIcon className="text-gray-500" />}
@@ -103,23 +122,12 @@ export default function MangaVerse() {
                 className="w-full bg-gray-800 border-gray-700 text-white"
               />
             </div>
-
-            <Select onValueChange={setTypeFilter} value={typeFilter}>
-              <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700">
-                <SelectValue placeholder="Filter Type">
-                  <div className="flex items-center">
-                    <FilterIcon className="mr-2 h-4 w-4" />
-                    {typeFilter}
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Types</SelectItem>
-                <SelectItem value="Manga">Manga</SelectItem>
-                <SelectItem value="Manhwa">Manhwa</SelectItem>
-                <SelectItem value="Manhua">Manhua</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="w-full md:w-48">
+              <FilterDropdown
+                onTypeChange={handleTypeChange}
+                selectedType={selectedType}
+              />
+            </div>
           </div>
         </header>
 
