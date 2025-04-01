@@ -46,6 +46,7 @@ export const authOptions = {
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.image = token.image;
+        session.user.role = token.role;
       }
 
       return session;
@@ -54,6 +55,8 @@ export const authOptions = {
       if (user) {
         token.id = user.id;
         token.image = user.image;
+        token.name = user.name;
+        token.role = user.role;
       }
       return token;
     },
@@ -64,6 +67,10 @@ export const authOptions = {
   debug: process.env.NODE_ENV === "development",
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 hari
+  },
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 hari
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
