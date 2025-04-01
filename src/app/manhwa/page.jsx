@@ -20,7 +20,7 @@ export default function ManhwaPage() {
       const response = await fetch("/api/proxy?type=manhwa");
       const data = await response.json();
 
-      console.log("API Response:", data);
+      //   console.log("API Response:", data);
 
       if (data.success && data.data) {
         // Map param to slug for consistency
@@ -46,7 +46,7 @@ export default function ManhwaPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white py-8">
       <div className="container mx-auto px-4">
         <PageTitle
-          title="manhwa"
+          title="Manhwa"
           icon={<Book className="h-6 w-6 text-purple-500" />}
         />
 

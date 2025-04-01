@@ -60,7 +60,7 @@ export default function MangaVerse() {
         `/api/komiks?search=${encodeURIComponent(query)}`
       );
       const data = await response.json();
-      console.log(data);
+      // console.log(data);
 
       setKomiks(data.data); // Set komiks dengan data yang baru di-fetch
       setNextPage(data.next_page); // Atur nextPage jika ada

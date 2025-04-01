@@ -29,7 +29,7 @@ export default function MangaPage() {
           slug: item.param || item.id?.toString(), // Use param as slug
         }));
 
-        console.log("Processed manga Data:", validmanga);
+        // console.log("Processed manga Data:", validmanga);
         setmangaList(validmanga);
       } else {
         throw new Error(data.message || "Failed to fetch manga");
@@ -46,7 +46,7 @@ export default function MangaPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white py-8">
       <div className="container mx-auto px-4">
         <PageTitle
-          title="manga"
+          title="Manga"
           icon={<Book className="h-6 w-6 text-purple-500" />}
         />
 

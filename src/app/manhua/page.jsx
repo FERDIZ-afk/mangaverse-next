@@ -72,7 +72,7 @@ export default function ManhuaPage() {
 
 function ManhuaCard({ manhua }) {
   // For debugging
-  console.log("Data manhua:", manhua);
+  //   console.log("Data manhua:", manhua);
 
   return (
     <Link href={`/manhua/${manhua.slug}`}>
