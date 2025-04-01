@@ -1,101 +1,197 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/";
+import { useSession, signOut } from "next-auth/react";
+import IconsWaguri from "../../public/logo.jpg";
+
 import {
-  BookOpen,
-  User,
-  LogOut,
-  Bookmark,
-  History,
   Menu,
   X,
+  User,
+  LogOut,
+  Settings,
+  Bookmark,
+  History,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { Button } from "@/components/ui/";
+
+const navigationItems = [
+  {
+    title: "Manga",
+    href: "/manga",
+  },
+  {
+    title: "Manhwa",
+    href: "/manhwa",
+  },
+  {
+    title: "Manhua",
+    href: "/manhua",
+  },
+];
 
 export default function Navbar() {
-  const { data: session, status } = useSession();
   const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session, status } = useSession();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
-  const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.push("/");
-    router.refresh();
-  };
+  // Handle scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
 
-  const toggleMenu = () => {
-    setMenuOpen(!menuOpen);
+    // Close menus when clicking outside
+    const handleClickOutside = (event) => {
+      if (isUserMenuOpen && !event.target.closest(".user-menu-container")) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    // Implement actual theme toggling logic here
   };
 
   return (
-    <nav className="bg-gray-800 border-b border-gray-700">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex justify-between items-center">
-          <Link href="/" className="flex items-center">
-            <BookOpen className="text-purple-500 h-6 w-6 mr-2" />
-            <span className="text-xl font-bold text-white">MangaVerse</span>
-          </Link>
+    <header
+      className={`fixed w-full z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-gray-900/95 backdrop-blur-sm shadow-lg"
+          : "bg-gradient-to-b from-gray-900 to-transparent"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo - DIGANTI DENGAN WAGURI */}
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center">
+              <div className="h-8 w-8 relative overflow-hidden rounded-full">
+                <Image
+                  src={IconsWaguri}
+                  alt="MangaVerse"
+                  width={32}
+                  height={32}
+                  className="object-cover"
+                />
+              </div>
+              <span className="ml-2 text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 text-transparent bg-clip-text">
+                MangaVerse
+              </span>
+            </Link>
+          </div>
 
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden text-gray-300 hover:text-white"
-            onClick={toggleMenu}
-          >
-            {menuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex md:items-center md:space-x-6">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="text-gray-300 hover:text-white transition-colors"
+              >
+                {item.title}
+              </Link>
+            ))}
+          </div>
 
-          {/* Desktop menu */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Right Navigation - Desktop */}
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            <button
+              onClick={toggleDarkMode}
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </button>
+
+            <Link
+              href="/bookmark"
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors"
+              aria-label="Bookmarks"
+            >
+              <Bookmark className="h-5 w-5" />
+            </Link>
+
+            <Link
+              href="/history"
+              className="text-gray-300 hover:text-white p-1.5 rounded-full hover:bg-gray-800 transition-colors"
+              aria-label="History"
+            >
+              <History className="h-5 w-5" />
+            </Link>
+
             {status === "authenticated" ? (
-              <>
-                <Link
-                  href="/history"
-                  className="text-gray-300 hover:text-white flex items-center"
+              <div className="relative user-menu-container">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center justify-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <History className="h-5 w-5 mr-1" />
-                  <span>History</span>
-                </Link>
-                <Link
-                  href="/bookmarks"
-                  className="text-gray-300 hover:text-white flex items-center"
-                >
-                  <Bookmark className="h-5 w-5 mr-1" />
-                  <span>Bookmark</span>
-                </Link>
-                <div className="relative group">
-                  <button className="text-gray-300 hover:text-white flex items-center">
-                    <User className="h-5 w-5 mr-1" />
-                    <span className="max-w-[100px] truncate">
-                      {session.user.name}
-                    </span>
-                  </button>
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-gray-700 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-gray-300 hover:bg-gray-600 hover:text-white flex items-center"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      <span>Profil Saya</span>
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-600 hover:text-white flex items-center"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      <span>Logout</span>
-                    </button>
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
+                    {session.user?.name?.charAt(0) || (
+                      <User className="h-4 w-4" />
+                    )}
                   </div>
-                </div>
-              </>
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                    <div
+                      className="py-1"
+                      role="menu"
+                      aria-orientation="vertical"
+                    >
+                      <Link
+                        href="/profile"
+                        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Profil
+                      </Link>
+                      {/* <Link
+                        href="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Pengaturan
+                      </Link> */}
+                      <button
+                        onClick={() => signOut()}
+                        className="flex w-full items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              <>
+              <div className="flex space-x-2">
                 <Link href="/login">
                   <Button
                     variant="outline"
-                    className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                    className="border-purple-500 text-purple-500 hover:bg-purple-500 hover:text-white"
                   >
                     Login
                   </Button>
@@ -105,84 +201,127 @@ export default function Navbar() {
                     Daftar
                   </Button>
                 </Link>
-              </>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden mt-4 space-y-2">
+          {/* Mobile Menu Button */}
+          <div className="flex items-center space-x-3 md:hidden">
             {status === "authenticated" ? (
-              <>
-                <div className="flex items-center mb-4">
-                  <User className="h-5 w-5 mr-2 text-purple-400" />
-                  <span className="text-white font-medium">
-                    {session.user.name}
-                  </span>
-                </div>
-                <Link
-                  href="/profile"
-                  className="block py-2 px-4 text-gray-300 hover:text-white rounded hover:bg-gray-700"
-                  onClick={toggleMenu}
-                >
-                  <div className="flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    <span>Profil Saya</span>
-                  </div>
-                </Link>
-                <Link
-                  href="/history"
-                  className="block py-2 px-4 text-gray-300 hover:text-white rounded hover:bg-gray-700"
-                  onClick={toggleMenu}
-                >
-                  <div className="flex items-center">
-                    <History className="h-5 w-5 mr-2" />
-                    <span>History Baca</span>
-                  </div>
-                </Link>
-                <Link
-                  href="/bookmarks"
-                  className="block py-2 px-4 text-gray-300 hover:text-white rounded hover:bg-gray-700"
-                  onClick={toggleMenu}
-                >
-                  <div className="flex items-center">
-                    <Bookmark className="h-5 w-5 mr-2" />
-                    <span>Bookmark</span>
-                  </div>
-                </Link>
+              <div className="relative user-menu-container">
                 <button
-                  onClick={() => {
-                    handleLogout();
-                    toggleMenu();
-                  }}
-                  className="w-full text-left py-2 px-4 text-red-300 hover:text-red-200 rounded hover:bg-gray-700 flex items-center"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center justify-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <LogOut className="h-5 w-5 mr-2" />
-                  <span>Logout</span>
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
+                    {session.user?.name?.charAt(0) || (
+                      <User className="h-4 w-4" />
+                    )}
+                  </div>
                 </button>
-              </>
-            ) : (
-              <div className="flex flex-col space-y-2">
-                <Link
-                  href="/login"
-                  className="py-2 px-4 text-gray-300 hover:text-white rounded hover:bg-gray-700 text-center"
-                  onClick={toggleMenu}
-                >
-                  Login
+
+                {isUserMenuOpen && (
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                    <div
+                      className="py-1"
+                      role="menu"
+                      aria-orientation="vertical"
+                    >
+                      <Link
+                        href="/profile"
+                        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Profil
+                      </Link>
+                      <Link
+                        href="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Pengaturan
+                      </Link>
+                      <button
+                        onClick={() => signOut()}
+                        className="flex w-full items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+            >
+              {isMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-gray-800 shadow-lg">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {item.title}
+              </Link>
+            ))}
+
+            <div className="pt-2 pb-1 border-t border-gray-700">
+              <Link
+                href="/bookmark"
+                className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Bookmark className="h-5 w-5 mr-2" />
+                Bookmark
+              </Link>
+              <Link
+                href="/history"
+                className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <History className="h-5 w-5 mr-2" />
+                Riwayat Baca
+              </Link>
+            </div>
+
+            {status !== "authenticated" && (
+              <div className="mt-4 space-y-2 px-3 pt-2 border-t border-gray-700">
+                <Link href="/login" onClick={() => setIsMenuOpen(false)}>
+                  <Button
+                    variant="outline"
+                    className="w-full border-purple-500 text-purple-500 hover:bg-purple-500 hover:text-white"
+                  >
+                    Login
+                  </Button>
                 </Link>
-                <Link
-                  href="/register"
-                  className="py-2 px-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded text-center"
-                  onClick={toggleMenu}
-                >
-                  Daftar
+                <Link href="/register" onClick={() => setIsMenuOpen(false)}>
+                  <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+                    Daftar
+                  </Button>
                 </Link>
               </div>
             )}
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+      )}
+    </header>
   );
 }

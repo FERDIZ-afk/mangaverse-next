@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/";
 
-export default function ChapterList({ chapters = [], mangaSlug }) {
+export default function ChapterList({ chapters = [], manhwaSlug }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleChapters, setVisibleChapters] = useState(50);
   const [sortAscending, setSortAscending] = useState(false);
@@ -127,7 +127,7 @@ export default function ChapterList({ chapters = [], mangaSlug }) {
             .map((chapter, index) => (
               <Link
                 key={chapter.slug || index}
-                href={`/manga/chapter/${chapter.slug}`}
+                href={`/manhwa/chapter/${chapter.slug}`}
                 className="flex items-center justify-between px-4 py-3 border-b border-gray-800/50 hover:bg-gray-800/50 transition-colors"
               >
                 <div className="flex items-center space-x-2">
