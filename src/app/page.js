@@ -40,6 +40,7 @@ export default function MangaVerse() {
 
       const response = await fetch(apiUrl);
       const data = await response.json();
+      console.log(data);
 
       setKomiks((prevKomiks) =>
         url ? [...prevKomiks, ...data.data] : data.data
@@ -49,6 +50,35 @@ export default function MangaVerse() {
     } catch (error) {
       console.error("Error fetching komiks:", error);
       setLoading(false);
+    }
+  };
+
+  const fetchKomiksBySearch = async (query) => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `/api/komiks?search=${encodeURIComponent(query)}`
+      );
+      const data = await response.json();
+      console.log(data);
+
+      setKomiks(data.data); // Set komiks dengan data yang baru di-fetch
+      setNextPage(data.next_page); // Atur nextPage jika ada
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching komiks:", error);
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.length > 0) {
+      fetchKomiksBySearch(query); // Panggil fungsi fetch berdasarkan query
+    } else {
+      fetchKomiks(); // Jika query kosong, ambil semua komik
     }
   };
 
@@ -74,14 +104,19 @@ export default function MangaVerse() {
     // Filter logic
     let result = komiks;
 
-    if (typeFilter !== "All") {
-      result = result.filter((komik) => komik.type === typeFilter);
-    }
+    // Pastikan data tidak kosong
+    if (result.length > 0) {
+      // Filter berdasarkan type
+      if (typeFilter !== "All") {
+        result = result.filter((komik) => komik.type === typeFilter);
+      }
 
-    if (searchQuery) {
-      result = result.filter((komik) =>
-        komik.title.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      // Filter berdasarkan query pencarian
+      if (searchQuery) {
+        result = result.filter((komik) =>
+          komik.title.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
     }
 
     setFilteredKomiks(result);
@@ -111,6 +146,9 @@ export default function MangaVerse() {
           <p className="text-center text-gray-400 mb-6">
             Website masih dalam tahap pengembangan
           </p>
+          <p className="text-center text-gray-400 mb-6">
+            tolong refresh kembali jika komik tidak ditampilkan
+          </p>
 
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-grow relative">
@@ -118,7 +156,7 @@ export default function MangaVerse() {
                 icon={<SearchIcon className="text-gray-500" />}
                 placeholder="Search manga..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearch}
                 className="w-full bg-gray-800 border-gray-700 text-white"
               />
             </div>
@@ -142,6 +180,8 @@ export default function MangaVerse() {
                     width={300}
                     height={400}
                     className="w-full h-64 object-cover rounded-t-lg"
+                    quality={80}
+                    priority={true}
                   />
                   <Badge
                     className={`absolute top-2 right-2 ${getColorForRating(
