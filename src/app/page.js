@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/";
 import { FilterIcon, StarIcon, BookOpenIcon, SearchIcon } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import SearchButton from "@/components/SearchKomik";
 
 export default function MangaVerse() {
   const [komiks, setKomiks] = useState([]);
@@ -140,6 +141,82 @@ export default function MangaVerse() {
       {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
+          {/* <SearchButton /> */}
+          {/* <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+            MangaVerse
+          </h1> */}
+          {/* <p className="text-center text-gray-400 mb-6">
+            Website masih dalam tahap pengembangan
+          </p>
+          <p className="text-center text-gray-400 mb-6">
+            tolong refresh kembali jika komik tidak ditampilkan
+          </p> */}
+
+          <div className="w-[90%] sm:w-95% m-auto">
+            <section id="carousel" className="sm:px-10 px-3 mt-12 sm:mt-20 ">
+              <div className="sm:grid sm:grid-cols-4 gap-10">
+                <div className="info sm:col-span-3 py-3 sm:mt-5">
+                  <div className="title">
+                    <h1 className="text-white font-noto-sans text-2xl sm:text-4xl ">
+                      Ore no Ie ga Maryoku Spot Datta Ken: Sundeiru dake de
+                      Sekai Saikyou
+                    </h1>
+                    <p className="mt-5 text-white font-medium font-open-sans w-full text-sm sm:text-base sm:w-[80%]">
+                      Hidup riang di rumah adalah cara pintas terbesar — rumah
+                      saya adalah Tempat Daya Ajaib terbesar di dunia. Itulah
+                      yang terjadi, baik rumah saya dan saya dipanggil ke dunia
+                      lain oleh beberapa orang yang membidiknya. Namun, saya
+                      telah tinggal di tempat ini selama bertahun-tahun dan
+                      tubuh saya, tampaknya, terlalu meluap dengan sihir. Karena
+                      keadaan yang tak terduga oleh orang-orang yang
+                      memanggilku, mereka dengan cepat melarikan diri. Meskipun
+                      begitu, masih ada beberapa orang yang tidak sopan yang
+                      mengingini sihir yang bocor keluar dari rumahku. Saya
+                      tidak akan menyerahkan rumah saya kepada orang-orang itu!
+                      Saya akan menggunakan kekuatan saya sesuka saya!
+                    </p>
+
+                    <Link href="/manga/ore-no-ie-ga-maryoku-spot-datta-ken-sundeiru-dake-de-sekai-saikyou">
+                      <button className="text-white px-4 py-2 text-sm  rounded-sm ring-1 ring-[#FF7F57] mt-8 flex items-center gap-3 font-montserrat font-medium sm:text-base">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="w-6 h-6"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
+                          />
+                        </svg>
+
+                        <span className="dark:text-white text-zinc-950">
+                          Read Now
+                        </span>
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+                <div className="sm:col-span-1 hidden sm:block">
+                  <div className="images ">
+                    <Image
+                      src="https://i0.wp.com/www.maid.my.id/wp-content/uploads/2018/07/e1d0db35-b6fb-4a5f-bf6b-127cd8758324.jpg"
+                      alt="test"
+                      width={150}
+                      height={150}
+                      referrerPolicy="no-referrer"
+                      className="w-full rounded-lg rotate-3 h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+          {/* <div className="container mx-auto px-4 py-8">
+        <header className="mb-8">
           <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
             MangaVerse
           </h1>
@@ -148,9 +225,9 @@ export default function MangaVerse() {
           </p>
           <p className="text-center text-gray-400 mb-6">
             tolong refresh kembali jika komik tidak ditampilkan
-          </p>
+          </p> */}
 
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+          {/* <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-grow relative">
               <Input
                 icon={<SearchIcon className="text-gray-500" />}
@@ -165,6 +242,14 @@ export default function MangaVerse() {
                 onTypeChange={handleTypeChange}
                 selectedType={selectedType}
               />
+            </div>
+          </div> */}
+          {/* <SearchButton /> */}
+          <div className="flex justify-between mt-4">
+            <div className="title">
+              <h1 className="text-lg font-noto-sans sm:text-2xl text-white">
+                Latest Updated
+              </h1>
             </div>
           </div>
         </header>
