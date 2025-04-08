@@ -1,91 +1,164 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import FilterDropdown from "@/components/FilterDropdown";
+import { useInView } from "react-intersection-observer";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  useInfiniteQuery,
+} from "react-query";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
+  Badge,
+  Button,
+  Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Button,
-  Badge,
-  Input,
 } from "@/components/ui/";
-import { FilterIcon, StarIcon, BookOpenIcon, SearchIcon } from "lucide-react";
-import Navbar from "@/components/Navbar";
-import SearchButton from "@/components/SearchKomik";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StarIcon, BookOpenIcon, SearchIcon } from "lucide-react";
 
-export default function MangaVerse() {
-  const [komiks, setKomiks] = useState([]);
-  const [filteredKomiks, setFilteredKomiks] = useState([]);
-  const [nextPage, setNextPage] = useState(null);
-  const [loading, setLoading] = useState(true);
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // Don't retry if we got a 4xx response
+        if (error?.status >= 400 && error?.status < 500) return false;
+        // Otherwise retry up to 3 times
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    },
+  },
+});
+
+// Wrapper component
+export default function MangaVerseWrapper() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MangaVerse />
+    </QueryClientProvider>
+  );
+}
+
+function MangaVerse() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const fetchKomiks = async (url) => {
-    setLoading(true);
-    try {
-      // Menggunakan API route lokal sebagai proxy
-      const apiUrl = url
-        ? `/api/komiks?url=${encodeURIComponent(url)}`
-        : "/api/komiks";
+  // Intersection observer for infinite loading
+  const { ref: loadMoreRef, inView } = useInView({
+    threshold: 0.1,
+    triggerOnce: false,
+  });
 
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-      console.log(data);
-
-      setKomiks((prevKomiks) =>
-        url ? [...prevKomiks, ...data.data] : data.data
-      );
-      setNextPage(data.next_page);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching komiks:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchKomiksBySearch = async (query) => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/komiks?search=${encodeURIComponent(query)}`
-      );
-      const data = await response.json();
-      // console.log(data);
-
-      setKomiks(data.data); // Set komiks dengan data yang baru di-fetch
-      setNextPage(data.next_page); // Atur nextPage jika ada
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching komiks:", error);
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (e) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-
-    if (query.length > 0) {
-      fetchKomiksBySearch(query); // Panggil fungsi fetch berdasarkan query
-    } else {
-      fetchKomiks(); // Jika query kosong, ambil semua komik
-    }
-  };
-
+  // Debounce search input to prevent excessive API calls
   useEffect(() => {
-    fetchKomiks();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Update the fetchKomiksPage function with better error handling
+  const fetchKomiksPage = useCallback(
+    async ({ pageParam = null }) => {
+      let apiUrl = "/api/komiks";
+
+      // Handle search queries
+      if (debouncedQuery) {
+        apiUrl += `?search=${encodeURIComponent(debouncedQuery)}`;
+        if (pageParam) {
+          apiUrl += `&url=${encodeURIComponent(pageParam)}`;
+        }
+      }
+      // Handle regular pagination
+      else if (pageParam) {
+        apiUrl += `?url=${encodeURIComponent(pageParam)}`;
+      }
+
+      try {
+        const res = await fetch(apiUrl);
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `API responded with status: ${res.status}`
+          );
+        }
+
+        const data = await res.json();
+
+        // Check if this is fallback data and show a notification
+        if (data.fallback) {
+          // You can use a toast notification library here or set state to show a banner
+          console.warn("Using fallback/cached data due to API issues");
+          setShowFallbackNotice(true); // Add this state variable
+        } else {
+          setShowFallbackNotice(false);
+        }
+
+        return data;
+      } catch (err) {
+        console.error("Error fetching manga:", err);
+        throw err;
+      }
+    },
+    [debouncedQuery]
+  );
+
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    status,
+    error,
+    refetch,
+    isRefetching,
+  } = useInfiniteQuery(
+    ["komiks", debouncedQuery, typeFilter],
+    fetchKomiksPage,
+    {
+      getNextPageParam: (lastPage) => lastPage.next_page || undefined,
+      refetchOnMount: false,
+      refetchOnReconnect: true,
+      // Add better error handling with retry configuration
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors
+        if (error?.status >= 400 && error?.status < 500) return false;
+        // Retry up to 3 times for other errors
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // Add onError handler
+      onError: (error) => {
+        console.error("Error fetching manga:", error);
+      },
+    }
+  );
+
+  const [showFallbackNotice, setShowFallbackNotice] = useState(false);
+
+  // Load more when scrolling to the bottom
+  useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleTypeChange = (type) => {
     setSelectedType(type);
@@ -101,33 +174,18 @@ export default function MangaVerse() {
     }
   };
 
-  useEffect(() => {
-    // Filter logic
-    let result = komiks;
-
-    // Pastikan data tidak kosong
-    if (result.length > 0) {
-      // Filter berdasarkan type
-      if (typeFilter !== "All") {
-        result = result.filter((komik) => komik.type === typeFilter);
-      }
-
-      // Filter berdasarkan query pencarian
-      if (searchQuery) {
-        result = result.filter((komik) =>
-          komik.title.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-    }
-
-    setFilteredKomiks(result);
-  }, [komiks, typeFilter, searchQuery]);
-
-  const loadMoreKomiks = () => {
-    if (nextPage) {
-      fetchKomiks(nextPage);
-    }
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
   };
+
+  // Filter komiks based on type
+  const filteredKomiks =
+    data?.pages.flatMap(
+      (page) =>
+        page.data?.filter(
+          (komik) => typeFilter === "All" || komik.type === typeFilter
+        ) || []
+    ) || [];
 
   const getColorForRating = (rating) => {
     const parsedRating = parseFloat(rating);
@@ -136,24 +194,25 @@ export default function MangaVerse() {
     return "bg-red-500";
   };
 
+  // Progressive image loading with blur placeholder
+  const shimmer = (w, h) => `
+    <svg width="${w}" height="${h}" version="1.1" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${w}" height="${h}" fill="#2D3748" />
+    </svg>
+  `;
+
+  const toBase64 = (str) =>
+    typeof window === "undefined"
+      ? Buffer.from(str).toString("base64")
+      : window.btoa(str);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
-      {/* <Navbar /> */}
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
-          {/* <SearchButton /> */}
-          {/* <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
-            MangaVerse
-          </h1> */}
-          {/* <p className="text-center text-gray-400 mb-6">
-            Website masih dalam tahap pengembangan
-          </p>
-          <p className="text-center text-gray-400 mb-6">
-            tolong refresh kembali jika komik tidak ditampilkan
-          </p> */}
-
           <div className="w-[90%] sm:w-95% m-auto">
             <section id="carousel" className="sm:px-10 px-3 mt-12 sm:mt-20 ">
+              {/* Featured Manga Section */}
               <div className="sm:grid sm:grid-cols-4 gap-10">
                 <div className="info sm:col-span-3 py-3 sm:mt-5">
                   <div className="title">
@@ -177,7 +236,7 @@ export default function MangaVerse() {
                     </p>
 
                     <Link href="/manga/ore-no-ie-ga-maryoku-spot-datta-ken-sundeiru-dake-de-sekai-saikyou">
-                      <button className="text-white px-4 py-2 text-sm  rounded-sm ring-1 ring-[#FF7F57] mt-8 flex items-center gap-3 font-montserrat font-medium sm:text-base">
+                      <button className="text-white px-4 py-2 text-sm rounded-sm ring-1 ring-[#FF7F57] mt-8 flex items-center gap-3 font-montserrat font-medium sm:text-base">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
@@ -209,106 +268,159 @@ export default function MangaVerse() {
                       height={150}
                       referrerPolicy="no-referrer"
                       className="w-full rounded-lg rotate-3 h-full object-cover"
+                      priority={true} // Load this prominently displayed image early
                     />
                   </div>
                 </div>
               </div>
             </section>
           </div>
-          {/* <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold text-center mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
-            MangaVerse
-          </h1>
-          <p className="text-center text-gray-400 mb-6">
-            Website masih dalam tahap pengembangan
-          </p>
-          <p className="text-center text-gray-400 mb-6">
-            tolong refresh kembali jika komik tidak ditampilkan
-          </p> */}
 
-          {/* <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-grow relative">
-              <Input
-                icon={<SearchIcon className="text-gray-500" />}
-                placeholder="Search manga..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="w-full bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
-            <div className="w-full md:w-48">
-              <FilterDropdown
-                onTypeChange={handleTypeChange}
-                selectedType={selectedType}
-              />
-            </div>
-          </div> */}
-          {/* <SearchButton /> */}
-          <div className="flex justify-between mt-4">
+          {/* Search and Filter Section */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-8">
             <div className="title">
               <h1 className="text-lg font-noto-sans sm:text-2xl text-white">
                 Latest Updated
               </h1>
             </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                {/* <Input */}
+                {/* type="text" */}
+                {/* placeholder="Search manga..." */}
+                {/* value={searchQuery} */}
+                {/* onChange={handleSearch} */}
+                {/* className="bg-gray-800 border-gray-700 pl-9" */}
+                {/* /> */}
+                {/* <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" /> */}
+              </div>
+              {/* 
+              <Select value={selectedType} onValueChange={handleTypeChange}>
+                <SelectTrigger className="w-full sm:w-32 bg-gray-800 border-gray-700">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="manga">Manga</SelectItem>
+                  <SelectItem value="manhwa">Manhwa</SelectItem>
+                  <SelectItem value="manhua">Manhua</SelectItem>
+                </SelectContent>
+              </Select> */}
+            </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {filteredKomiks.map((komik) => (
-            <Link href={`/manga/${komik.param}`} key={komik.param}>
-              <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform cursor-pointer h-full">
-                <div className="relative">
-                  <Image
-                    src={komik.thumbnail}
-                    alt={komik.title}
-                    width={300}
-                    height={400}
-                    className="w-full h-64 object-cover rounded-t-lg"
-                    quality={80}
-                    priority={true}
-                  />
-                  <Badge
-                    className={`absolute top-2 right-2 ${getColorForRating(
-                      komik.rating
-                    )}`}
-                  >
-                    <StarIcon className="h-4 w-4 mr-1" />
-                    {komik.rating}
-                  </Badge>
-                </div>
-                <CardContent className="p-3">
-                  <h3 className="text-sm font-bold truncate text-white mb-1">
-                    {komik.title}
-                  </h3>
-                  <div className="flex justify-between items-center">
-                    <Badge variant="secondary" className="bg-gray-700">
-                      <BookOpenIcon className="h-3 w-3 mr-1" />
-                      {komik.type}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-
-        {loading && (
-          <div className="text-center my-8">
-            <p className="text-xl animate-pulse">Loading more manga...</p>
-          </div>
-        )}
-
-        {nextPage && (
-          <div className="text-center mt-8">
+        {/* Error Display */}
+        {status === "error" && (
+          <div className="text-center my-8 p-4 bg-red-900 bg-opacity-50 rounded-lg">
+            <p className="text-red-200 mb-2">
+              {error?.message?.includes("timeout") ||
+              error?.message?.includes("too long")
+                ? "The manga server is taking too long to respond. This often happens when the server is starting up after being inactive."
+                : `Failed to load manga: ${error.message}`}
+            </p>
+            <p className="text-red-200 mb-4 text-sm">
+              {error?.message?.includes("timeout") &&
+                "The server will be faster on subsequent requests once it's active."}
+            </p>
             <Button
-              onClick={loadMoreKomiks}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              onClick={() => refetch()}
+              variant="outline"
+              className="border-red-500 text-red-200 hover:bg-red-900"
+              disabled={isRefetching}
             >
-              Load More Manga
+              {isRefetching ? "Retrying..." : "Retry Loading Manga"}
             </Button>
           </div>
         )}
+
+        {/* Manga Grid with Loading States */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {status === "loading"
+            ? // Loading skeletons
+              Array(12)
+                .fill(0)
+                .map((_, idx) => (
+                  <div
+                    key={`skeleton-${idx}`}
+                    className="bg-gray-800 rounded-lg overflow-hidden"
+                  >
+                    <Skeleton className="h-64 w-full bg-gray-700" />
+                    <div className="p-3">
+                      <Skeleton className="h-5 w-4/5 bg-gray-700 mb-2" />
+                      <Skeleton className="h-4 w-1/3 bg-gray-700" />
+                    </div>
+                  </div>
+                ))
+            : filteredKomiks.map((komik) => (
+                <Link href={`/manga/${komik.param}`} key={komik.param}>
+                  <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform cursor-pointer h-full">
+                    <div className="relative">
+                      <Image
+                        src={komik.thumbnail}
+                        alt={komik.title}
+                        width={300}
+                        height={400}
+                        className="w-full h-64 object-cover rounded-t-lg"
+                        quality={60} // Lower quality for thumbnails improves load time
+                        loading="lazy" // Lazy loading for images
+                        placeholder="blur"
+                        blurDataURL={`data:image/svg+xml;base64,${toBase64(
+                          shimmer(300, 400)
+                        )}`}
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder-manga.jpg"; // Fallback image
+                        }}
+                      />
+                      <Badge
+                        className={`absolute top-2 right-2 ${getColorForRating(
+                          komik.rating
+                        )}`}
+                      >
+                        <StarIcon className="h-4 w-4 mr-1" />
+                        {komik.rating}
+                      </Badge>
+                    </div>
+                    <CardContent className="p-3">
+                      <h3 className="text-sm font-bold truncate text-white mb-1">
+                        {komik.title}
+                      </h3>
+                      <div className="flex justify-between items-center">
+                        <Badge variant="secondary" className="bg-gray-700">
+                          <BookOpenIcon className="h-3 w-3 mr-1" />
+                          {komik.type}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+        </div>
+
+        {/* Loading more indicator and ref for intersection observer */}
+        <div ref={loadMoreRef} className="text-center my-8">
+          {isFetchingNextPage && (
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-10 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-2"></div>
+              <p className="text-gray-400">Loading more manga...</p>
+            </div>
+          )}
+
+          {!hasNextPage &&
+            status !== "loading" &&
+            filteredKomiks.length > 0 && (
+              <p className="text-gray-400 mt-4">You've reached the end!</p>
+            )}
+
+          {status !== "loading" && filteredKomiks.length === 0 && (
+            <div className="text-center my-12">
+              <p className="text-xl text-gray-400">
+                No manga found matching your criteria
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
