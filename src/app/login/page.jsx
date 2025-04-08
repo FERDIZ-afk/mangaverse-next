@@ -33,11 +33,18 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      console.log("Attempting to sign in with:", {
+        email: formValues.email,
+        // jangan log password di production
+      });
+
       const result = await signIn("credentials", {
         redirect: false,
         email: formValues.email,
         password: formValues.password,
       });
+
+      console.log("Sign in result:", result);
 
       if (result.error) {
         setError(result.error);
@@ -46,8 +53,8 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (error) {
-      setError("Terjadi kesalahan saat login");
-      console.error("Login error:", error);
+      console.error("Login error details:", error);
+      setError("Terjadi kesalahan saat login. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
     }
