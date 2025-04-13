@@ -19,7 +19,7 @@ export async function middleware(request) {
   // Daftar domain yang diizinkan
   const allowedOrigins = [
     "http://localhost:3000", // Development
-    "https://mangaverse.vercel.app", // Sesuaikan dengan domain produksi Anda
+    "https://mangaverse.my.id", // Sesuaikan dengan domain produksi Anda
     // Tambahkan domain lain yang diizinkan di sini
   ];
 
