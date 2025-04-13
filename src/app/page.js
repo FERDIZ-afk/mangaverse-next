@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useInView } from "react-intersection-observer";
@@ -9,6 +9,7 @@ import {
   QueryClientProvider,
   useQuery,
   useInfiniteQuery,
+  useQueryClient,
 } from "react-query";
 import {
   Card,
@@ -23,9 +24,15 @@ import {
   SelectValue,
 } from "@/components/ui/";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StarIcon, BookOpenIcon, SearchIcon } from "lucide-react";
+import {
+  StarIcon,
+  BookOpenIcon,
+  SearchIcon,
+  WifiOffIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 
-// Create a client
+// Create a client with improved caching strategy
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -37,11 +44,50 @@ const queryClient = new QueryClient({
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      cacheTime: 30 * 60 * 1000, // 30 minutes - increased for better caching
     },
   },
 });
+
+// Local storage helpers for offline support
+const CACHE_KEY_PREFIX = "mangaverse_cache_";
+
+function saveToLocalCache(key, data) {
+  try {
+    const cacheData = {
+      data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(
+      `${CACHE_KEY_PREFIX}${key}`,
+      JSON.stringify(cacheData)
+    );
+    return true;
+  } catch (err) {
+    console.error("Failed to save to cache:", err);
+    return false;
+  }
+}
+
+function getFromLocalCache(key, maxAge = 60 * 60 * 1000) {
+  // Default max age: 1 hour
+  try {
+    const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${key}`);
+    if (!cached) return null;
+
+    const { data, timestamp } = JSON.parse(cached);
+    const age = Date.now() - timestamp;
+
+    // Return null if cache is too old
+    if (age > maxAge) return null;
+
+    return data;
+  } catch (err) {
+    console.error("Failed to read from cache:", err);
+    return null;
+  }
+}
 
 // Wrapper component
 export default function MangaVerseWrapper() {
@@ -53,29 +99,101 @@ export default function MangaVerseWrapper() {
 }
 
 function MangaVerse() {
+  const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [showFallbackNotice, setShowFallbackNotice] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [prefetchedNextPage, setPrefetchedNextPage] = useState(false);
 
-  // Intersection observer for infinite loading
+  // Ref to track network status
+  const networkStatusRef = useRef({
+    isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
+    lastOnlineCheck: Date.now(),
+  });
+
+  // Intersection observer for infinite loading with higher threshold
   const { ref: loadMoreRef, inView } = useInView({
-    threshold: 0.1,
+    threshold: 0.3, // Increased threshold for earlier loading
+    rootMargin: "400px", // Start loading earlier
     triggerOnce: false,
   });
 
-  // Debounce search input to prevent excessive API calls
+  // Prefetch observer for next page (farther ahead)
+  const { ref: prefetchRef, inView: shouldPrefetch } = useInView({
+    threshold: 0,
+    rootMargin: "800px", // Even farther ahead for prefetching
+    triggerOnce: false,
+  });
+
+  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 500);
+    }, 400); // Slightly reduced debounce time
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Update the fetchKomiksPage function with better error handling
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("App is back online");
+      networkStatusRef.current.isOnline = true;
+      networkStatusRef.current.lastOnlineCheck = Date.now();
+      setOfflineMode(false);
+      // Refetch data if we've been offline
+      if (status === "success") {
+        refetch();
+      }
+    };
+
+    const handleOffline = () => {
+      console.log("App is offline");
+      networkStatusRef.current.isOnline = false;
+      setOfflineMode(true);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Initial check
+    setOfflineMode(!navigator.onLine);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Cache key generation helper
+  const generateCacheKey = useCallback(
+    (query = "", filter = "All", pageUrl = null) => {
+      return `${query}_${filter}_${pageUrl || "initial"}`;
+    },
+    []
+  );
+
+  // Improved fetch function with offline support and better error handling
   const fetchKomiksPage = useCallback(
     async ({ pageParam = null }) => {
+      const cacheKey = generateCacheKey(debouncedQuery, typeFilter, pageParam);
+
+      // Check online status
+      const isOnline = navigator.onLine;
+      if (!isOnline) {
+        const cachedData = getFromLocalCache(cacheKey);
+        if (cachedData) {
+          setShowFallbackNotice(true);
+          return { ...cachedData, fallback: true };
+        }
+        throw new Error("You are offline and no cached data is available");
+      }
+
+      // If online, construct API URL
       let apiUrl = "/api/komiks";
 
       // Handle search queries
@@ -91,35 +209,100 @@ function MangaVerse() {
       }
 
       try {
-        const res = await fetch(apiUrl);
+        // Set a timeout for the fetch to prevent long-hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+
+        // Before fetching, check cache for fresher data
+        const cachedData = getFromLocalCache(cacheKey, 5 * 60 * 1000); // 5 min for normal operation
+
+        const fetchPromise = fetch(apiUrl, {
+          signal: controller.signal,
+          // Add headers for better caching
+          headers: {
+            "Cache-Control": "max-age=300", // Tell CDN to cache for 5 minutes
+            Pragma: "no-cache", // For older HTTP/1.0 caches
+          },
+        });
+
+        const res = await Promise.race([
+          fetchPromise,
+          // If we have cached data, use a longer timeout
+          new Promise((resolve, reject) => {
+            const timeoutDuration = cachedData ? 25000 : 15000; // 25s if we have fallback
+            setTimeout(() => {
+              if (cachedData) {
+                // We have fallback, so resolve with that instead of rejecting
+                resolve({
+                  json: async () => ({ ...cachedData, fallback: true }),
+                  ok: true,
+                });
+              } else {
+                reject(new Error("Request timed out"));
+              }
+            }, timeoutDuration);
+          }),
+        ]);
+
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
+          // For server errors, check cache
+          if (res.status >= 500 && cachedData) {
+            setShowFallbackNotice(true);
+            return { ...cachedData, fallback: true };
+          }
+
           const errorData = await res.json().catch(() => ({}));
           throw new Error(
             errorData.error || `API responded with status: ${res.status}`
           );
         }
 
+        // Parse response
         const data = await res.json();
 
-        // Check if this is fallback data and show a notification
-        if (data.fallback) {
-          // You can use a toast notification library here or set state to show a banner
-          console.warn("Using fallback/cached data due to API issues");
-          setShowFallbackNotice(true); // Add this state variable
-        } else {
+        // Cache successful responses
+        if (!data.fallback) {
+          saveToLocalCache(cacheKey, data);
           setShowFallbackNotice(false);
+        } else {
+          setShowFallbackNotice(true);
         }
+
+        // Record successful fetch for prefetching strategy
+        if (pageParam) {
+          setPrefetchedNextPage(true);
+        }
+
+        // Mark as no longer initial loading
+        setIsInitialLoading(false);
 
         return data;
       } catch (err) {
         console.error("Error fetching manga:", err);
+
+        // For timeouts or network errors, try to get cached data
+        if (
+          err.name === "AbortError" ||
+          err.message.includes("timed out") ||
+          err.message.includes("network") ||
+          !navigator.onLine
+        ) {
+          const cachedData = getFromLocalCache(cacheKey, 24 * 60 * 60 * 1000); // Allow 1-day old cache for errors
+          if (cachedData) {
+            setShowFallbackNotice(true);
+            return { ...cachedData, fallback: true };
+          }
+        }
+
         throw err;
       }
     },
-    [debouncedQuery]
+    [debouncedQuery, typeFilter, generateCacheKey]
   );
 
+  // More efficient query with better caching strategy and prefetching
   const {
     data,
     fetchNextPage,
@@ -136,22 +319,39 @@ function MangaVerse() {
       getNextPageParam: (lastPage) => lastPage.next_page || undefined,
       refetchOnMount: false,
       refetchOnReconnect: true,
-      // Add better error handling with retry configuration
+      // Improved error recovery
       retry: (failureCount, error) => {
-        // Don't retry on 4xx errors
+        // No retry for client errors or if we're offline and have no cache
         if (error?.status >= 400 && error?.status < 500) return false;
-        // Retry up to 3 times for other errors
+        if (!navigator.onLine && error.message.includes("offline"))
+          return false;
+        // Retry up to 3 times for server errors
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Add onError handler
+      // Improved stale time and cache time for this specific query
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      cacheTime: 60 * 60 * 1000, // 1 hour
+      // Better error handling
       onError: (error) => {
-        console.error("Error fetching manga:", error);
+        console.error("Query error fetching manga:", error);
+        if (!navigator.onLine) {
+          setOfflineMode(true);
+        }
+      },
+      onSuccess: () => {
+        // Reset offline mode if we successfully fetched data
+        if (offlineMode && navigator.onLine) {
+          setOfflineMode(false);
+        }
+        setIsInitialLoading(false);
+      },
+      onSettled: () => {
+        // Always mark initial loading as false when query settles
+        setIsInitialLoading(false);
       },
     }
   );
-
-  const [showFallbackNotice, setShowFallbackNotice] = useState(false);
 
   // Load more when scrolling to the bottom
   useEffect(() => {
@@ -159,6 +359,47 @@ function MangaVerse() {
       fetchNextPage();
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Prefetch next page in advance
+  useEffect(() => {
+    if (
+      shouldPrefetch &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      !prefetchedNextPage &&
+      data?.pages
+    ) {
+      // Just trigger the prefetch but don't await it
+      console.log("Prefetching next page");
+      const nextPageToFetch = data.pages[data.pages.length - 1].next_page;
+      if (nextPageToFetch) {
+        // Mark as prefetched to avoid multiple prefetches
+        setPrefetchedNextPage(true);
+
+        // Use queryClient directly to prefetch
+        queryClient.prefetchInfiniteQuery(
+          ["komiks", debouncedQuery, typeFilter],
+          () => fetchKomiksPage({ pageParam: nextPageToFetch }),
+          { staleTime: 2 * 60 * 1000 } // 2 minutes
+        );
+      }
+    }
+  }, [
+    shouldPrefetch,
+    hasNextPage,
+    isFetchingNextPage,
+    data,
+    queryClient,
+    debouncedQuery,
+    typeFilter,
+    fetchKomiksPage,
+    prefetchedNextPage,
+  ]);
+
+  // Reset prefetched flag when filter changes
+  useEffect(() => {
+    setPrefetchedNextPage(false);
+  }, [debouncedQuery, typeFilter]);
 
   const handleTypeChange = (type) => {
     setSelectedType(type);
@@ -178,7 +419,7 @@ function MangaVerse() {
     setSearchQuery(e.target.value);
   };
 
-  // Filter komiks based on type
+  // Filter komiks based on type - moved out of render for better performance
   const filteredKomiks =
     data?.pages.flatMap(
       (page) =>
@@ -210,9 +451,9 @@ function MangaVerse() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
+          {/* Featured manga section remains unchanged */}
           <div className="w-[90%] sm:w-95% m-auto">
             <section id="carousel" className="sm:px-10 px-3 mt-12 sm:mt-20 ">
-              {/* Featured Manga Section */}
               <div className="sm:grid sm:grid-cols-4 gap-10">
                 <div className="info sm:col-span-3 py-3 sm:mt-5">
                   <div className="title">
@@ -311,40 +552,74 @@ function MangaVerse() {
           </div>
         </header>
 
-        {/* Error Display */}
+        {/* Offline Mode Notice */}
+        {offlineMode && (
+          <div className="text-center my-4 p-3 bg-blue-900 bg-opacity-50 rounded-lg flex items-center justify-center gap-2">
+            <WifiOffIcon className="h-5 w-5 text-blue-200" />
+            <p className="text-blue-200">
+              Anda sedang offline. Menampilkan manga dari cache lokal.
+            </p>
+          </div>
+        )}
+
+        {/* Fallback Notice */}
+        {showFallbackNotice && !offlineMode && (
+          <div className="text-center my-4 p-3 bg-yellow-900 bg-opacity-50 rounded-lg">
+            <p className="text-yellow-200 flex items-center justify-center gap-2">
+              <RefreshCwIcon className="h-5 w-5 animate-spin" />
+              <span>
+                Server manga sedang lambat. Menampilkan data cache sementara...
+              </span>
+            </p>
+          </div>
+        )}
+
+        {/* Error Display with improved messaging */}
         {status === "error" && (
           <div className="text-center my-8 p-4 bg-red-900 bg-opacity-50 rounded-lg">
             <p className="text-red-200 mb-2">
               {error?.message?.includes("timeout") ||
               error?.message?.includes("too long")
-                ? "The manga server is taking too long to respond. This often happens when the server is starting up after being inactive."
-                : `Failed to load manga: ${error.message}`}
+                ? "Server manga sedang lambat merespons. Ini sering terjadi ketika server baru memulai setelah tidak aktif."
+                : error?.message?.includes("offline")
+                ? "Anda sedang offline. Hubungkan kembali ke internet untuk memuat manga baru."
+                : `Gagal memuat manga: ${error.message}`}
             </p>
             <p className="text-red-200 mb-4 text-sm">
               {error?.message?.includes("timeout") &&
-                "The server will be faster on subsequent requests once it's active."}
+                "Server akan lebih cepat pada permintaan berikutnya setelah aktif."}
             </p>
             <Button
               onClick={() => refetch()}
               variant="outline"
               className="border-red-500 text-red-200 hover:bg-red-900"
-              disabled={isRefetching}
+              disabled={isRefetching || !navigator.onLine}
             >
-              {isRefetching ? "Retrying..." : "Retry Loading Manga"}
+              {isRefetching ? "Mencoba ulang..." : "Coba Muat Ulang"}
             </Button>
+          </div>
+        )}
+
+        {/* Initial loading skeleton with pulse animation */}
+        {isInitialLoading && (
+          <div className="text-center my-8">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-3"></div>
+              <p className="text-gray-300 animate-pulse">Memuat manga...</p>
+            </div>
           </div>
         )}
 
         {/* Manga Grid with Loading States */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {status === "loading"
-            ? // Loading skeletons
+          {status === "loading" && !data
+            ? // Loading skeletons only shown on initial load
               Array(12)
                 .fill(0)
                 .map((_, idx) => (
                   <div
                     key={`skeleton-${idx}`}
-                    className="bg-gray-800 rounded-lg overflow-hidden"
+                    className="bg-gray-800 rounded-lg overflow-hidden animate-pulse"
                   >
                     <Skeleton className="h-64 w-full bg-gray-700" />
                     <div className="p-3">
@@ -353,8 +628,11 @@ function MangaVerse() {
                     </div>
                   </div>
                 ))
-            : filteredKomiks.map((komik) => (
-                <Link href={`/manga/${komik.param}`} key={komik.param}>
+            : filteredKomiks.map((komik, index) => (
+                <Link
+                  href={`/manga/${komik.param}`}
+                  key={`${komik.param}-${index}`}
+                >
                   <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform cursor-pointer h-full">
                     <div className="relative">
                       <Image
@@ -363,8 +641,8 @@ function MangaVerse() {
                         width={300}
                         height={400}
                         className="w-full h-64 object-cover rounded-t-lg"
-                        quality={60} // Lower quality for thumbnails improves load time
-                        loading="lazy" // Lazy loading for images
+                        quality={50} // Lower quality for thumbnails improves load time
+                        loading={index < 12 ? "eager" : "lazy"} // Load first visible images eagerly
                         placeholder="blur"
                         blurDataURL={`data:image/svg+xml;base64,${toBase64(
                           shimmer(300, 400)
@@ -403,24 +681,33 @@ function MangaVerse() {
           {isFetchingNextPage && (
             <div className="flex flex-col items-center">
               <div className="w-10 h-10 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-2"></div>
-              <p className="text-gray-400">Loading more manga...</p>
+              <p className="text-gray-400">Memuat manga lainnya...</p>
             </div>
           )}
 
           {!hasNextPage &&
             status !== "loading" &&
             filteredKomiks.length > 0 && (
-              <p className="text-gray-400 mt-4">You've reached the end!</p>
+              <p className="text-gray-400 mt-4">
+                Anda telah mencapai akhir halaman!
+              </p>
             )}
 
           {status !== "loading" && filteredKomiks.length === 0 && (
             <div className="text-center my-12">
               <p className="text-xl text-gray-400">
-                No manga found matching your criteria
+                Tidak ada manga yang sesuai dengan kriteria pencarian
               </p>
             </div>
           )}
         </div>
+
+        {/* Hidden prefetch trigger - just a reference point for intersection observer */}
+        <div
+          ref={prefetchRef}
+          className="h-1 w-full opacity-0"
+          aria-hidden="true"
+        ></div>
       </div>
     </div>
   );
