@@ -34,6 +34,32 @@ img.w-full.h-auto {
   color: transparent !important;
 }
 
+/* Add rounded corners to cards */
+.card,
+[class*="card-"],
+.manga-item,
+.manga-cover {
+  border-radius: 0.5rem !important; /* 8px rounded corners */
+  overflow: hidden;
+}
+
+/* If you have specific elements that need rounded corners */
+.manga-card img,
+.latest-updated img,
+.thumbnail img {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* For any container elements that might need rounded corners */
+.grid > div,
+.grid-cols-3 > div,
+.grid-cols-4 > div,
+.grid-cols-5 > div,
+.grid-cols-6 > div {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
 /* Menghilangkan spacing pada elemen gambar */
 .flex-col.items-center {
   margin: 0 !important;

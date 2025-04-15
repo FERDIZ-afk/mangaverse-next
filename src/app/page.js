@@ -493,7 +493,7 @@ function MangaVerse() {
                           />
                         </svg>
 
-                        <span className="dark:text-white text-zinc-950">
+                        <span className="dark:text-white rounded-sm">
                           Read Now
                         </span>
                       </button>
@@ -508,7 +508,7 @@ function MangaVerse() {
                       width={150}
                       height={150}
                       referrerPolicy="no-referrer"
-                      className="w-full rounded-lg rotate-3 h-full object-cover"
+                      className="w-full rounded-xl rotate-3 h-full object-cover"
                       priority={true} // Load this prominently displayed image early
                     />
                   </div>
