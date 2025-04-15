@@ -73,8 +73,16 @@ export const authOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 hari
   },
   secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true, // Add this line
 };
 
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
+
+export const config = {
+  api: {
+    externalResolver: true,
+    bodyParser: false,
+  },
+};

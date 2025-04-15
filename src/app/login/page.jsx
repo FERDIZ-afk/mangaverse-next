@@ -33,18 +33,17 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      console.log("Attempting to sign in with:", {
-        email: formValues.email,
-        // jangan log password di production
-      });
-
       const result = await signIn("credentials", {
         redirect: false,
         email: formValues.email,
         password: formValues.password,
+        callbackUrl: window.location.origin,
       });
 
-      console.log("Sign in result:", result);
+      if (!result) {
+        setError("Terjadi kesalahan saat login. Silakan coba lagi.");
+        return;
+      }
 
       if (result.error) {
         setError(result.error);
