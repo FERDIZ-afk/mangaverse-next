@@ -16,24 +16,29 @@ export async function middleware(request) {
   // Hanya izinkan request dari aplikasi itu sendiri (same-origin) secara default
   const origin = request.headers.get("origin");
 
-  // Daftar domain yang diizinkan
+  // Modify your allowedOrigins to include any additional domains where your app is hosted
   const allowedOrigins = [
-    "http://localhost:3000", // Development
-    "https://mangaverse.my.id", // Sesuaikan dengan domain produksi Anda
-    // Tambahkan domain lain yang diizinkan di sini
+    "http://localhost:3000",
+    "https://mangaverse.my.id",
+    "https://www.mangaverse.my.id", // Include www subdomain if needed
+    "https://mangaverse-gamma.vercel.app",
+    "https://www.mangaverse-gamma.vercel.app",
   ];
 
-  if (origin) {
+  // Then ensure the auth callback route is excluded from origin checking or properly handled
+  if (request.nextUrl.pathname.startsWith("/api/auth/callback")) {
+    // Allow auth callbacks without strict origin checking
+    response.headers.set("Access-Control-Allow-Origin", origin || "*");
+  } else if (origin) {
+    // For other routes, continue with your existing origin validation
     if (allowedOrigins.includes(origin)) {
       response.headers.set("Access-Control-Allow-Origin", origin);
     } else {
-      // Jika origin tidak diizinkan, tolak request dengan CORS error
       return new NextResponse("CORS error: Domain tidak diizinkan", {
         status: 403,
       });
     }
   }
-
   // Izinkan metode HTTP yang dibutuhkan
   response.headers.set(
     "Access-Control-Allow-Methods",
