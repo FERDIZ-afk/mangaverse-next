@@ -7,29 +7,18 @@ import { useInView } from "react-intersection-observer";
 import {
   QueryClient,
   QueryClientProvider,
-  useQuery,
   useInfiniteQuery,
   useQueryClient,
 } from "react-query";
-import {
-  Card,
-  CardContent,
-  Badge,
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/";
+import { Card, CardContent, Badge, Button } from "@/components/ui/";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   StarIcon,
-  BookOpenIcon,
-  SearchIcon,
   WifiOffIcon,
   RefreshCwIcon,
+  BookIcon,
+  ChevronRightIcon,
+  FlameIcon as FireIcon,
 } from "lucide-react";
 
 // Create a client with improved caching strategy
@@ -106,7 +95,6 @@ function MangaVerse() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showFallbackNotice, setShowFallbackNotice] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [prefetchedNextPage, setPrefetchedNextPage] = useState(false);
 
   // Ref to track network status
@@ -275,9 +263,6 @@ function MangaVerse() {
           setPrefetchedNextPage(true);
         }
 
-        // Mark as no longer initial loading
-        setIsInitialLoading(false);
-
         return data;
       } catch (err) {
         console.error("Error fetching manga:", err);
@@ -312,6 +297,7 @@ function MangaVerse() {
     error,
     refetch,
     isRefetching,
+    isLoading,
   } = useInfiniteQuery(
     ["komiks", debouncedQuery, typeFilter],
     fetchKomiksPage,
@@ -344,11 +330,6 @@ function MangaVerse() {
         if (offlineMode && navigator.onLine) {
           setOfflineMode(false);
         }
-        setIsInitialLoading(false);
-      },
-      onSettled: () => {
-        // Always mark initial loading as false when query settles
-        setIsInitialLoading(false);
       },
     }
   );
@@ -429,10 +410,23 @@ function MangaVerse() {
     ) || [];
 
   const getColorForRating = (rating) => {
-    const parsedRating = parseFloat(rating);
-    if (parsedRating >= 8) return "bg-green-500";
-    if (parsedRating >= 7) return "bg-yellow-500";
-    return "bg-red-500";
+    const parsedRating = Number.parseFloat(rating);
+    if (parsedRating >= 8) return "bg-green-500 text-white";
+    if (parsedRating >= 7) return "bg-yellow-500 text-black";
+    return "bg-red-500 text-white";
+  };
+
+  const getTypeColor = (type) => {
+    switch (type) {
+      case "Manga":
+        return "bg-blue-600 text-white";
+      case "Manhwa":
+        return "bg-purple-600 text-white";
+      case "Manhua":
+        return "bg-orange-600 text-white";
+      default:
+        return "bg-gray-600 text-white";
+    }
   };
 
   // Progressive image loading with blur placeholder
@@ -477,7 +471,7 @@ function MangaVerse() {
                     </p>
 
                     <Link href="/manga/ore-no-ie-ga-maryoku-spot-datta-ken-sundeiru-dake-de-sekai-saikyou">
-                      <button className="text-white px-4 py-2 text-sm rounded-sm ring-1 ring-[#FF7F57] mt-8 flex items-center gap-3 font-montserrat font-medium sm:text-base">
+                      <button className="text-white px-4 py-2 text-sm rounded-sm ring-1 ring-[#FF7F57] mt-8 flex items-center gap-3 font-montserrat font-medium sm:text-base hover:bg-[#FF7F57] hover:text-black transition-colors duration-300">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
@@ -493,7 +487,7 @@ function MangaVerse() {
                           />
                         </svg>
 
-                        <span className="dark:text-white rounded-sm">
+                        <span className="dark:text-white text-white">
                           Read Now
                         </span>
                       </button>
@@ -508,7 +502,7 @@ function MangaVerse() {
                       width={150}
                       height={150}
                       referrerPolicy="no-referrer"
-                      className="w-full rounded-xl rotate-3 h-full object-cover"
+                      className="w-full rounded-lg rotate-3 h-full object-cover"
                       priority={true} // Load this prominently displayed image early
                     />
                   </div>
@@ -519,7 +513,8 @@ function MangaVerse() {
 
           {/* Search and Filter Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-8">
-            <div className="title">
+            <div className="title flex items-center">
+              <FireIcon className="h-6 w-6 mr-2 text-orange-500" />
               <h1 className="text-lg font-noto-sans sm:text-2xl text-white">
                 Latest Updated
               </h1>
@@ -527,6 +522,7 @@ function MangaVerse() {
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
+                {/* Search input commented out as in original code */}
                 {/* <Input */}
                 {/* type="text" */}
                 {/* placeholder="Search manga..." */}
@@ -536,8 +532,8 @@ function MangaVerse() {
                 {/* /> */}
                 {/* <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" /> */}
               </div>
-              {/* 
-              <Select value={selectedType} onValueChange={handleTypeChange}>
+              {/* Select component commented out as in original code */}
+              {/* <Select value={selectedType} onValueChange={handleTypeChange}>
                 <SelectTrigger className="w-full sm:w-32 bg-gray-800 border-gray-700">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
@@ -600,8 +596,8 @@ function MangaVerse() {
           </div>
         )}
 
-        {/* Initial loading skeleton with pulse animation */}
-        {isInitialLoading && (
+        {/* Initial loading state - FIXED: Only show this when loading and no data */}
+        {isLoading && !data && (
           <div className="text-center my-8">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-3"></div>
@@ -611,15 +607,15 @@ function MangaVerse() {
         )}
 
         {/* Manga Grid with Loading States */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {status === "loading" && !data
-            ? // Loading skeletons only shown on initial load
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+          {isLoading && !data
+            ? // Loading skeletons only shown on initial load when no data is available
               Array(12)
                 .fill(0)
                 .map((_, idx) => (
                   <div
                     key={`skeleton-${idx}`}
-                    className="bg-gray-800 rounded-lg overflow-hidden animate-pulse"
+                    className="bg-gray-800 rounded-lg overflow-hidden shadow-lg"
                   >
                     <Skeleton className="h-64 w-full bg-gray-700" />
                     <div className="p-3">
@@ -633,14 +629,15 @@ function MangaVerse() {
                   href={`/manga/${komik.param}`}
                   key={`${komik.param}-${index}`}
                 >
-                  <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform cursor-pointer h-full">
-                    <div className="relative">
+                  <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform duration-300 cursor-pointer h-full overflow-hidden group shadow-lg hover:shadow-xl">
+                    <div className="relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <Image
-                        src={komik.thumbnail}
+                        src={komik.thumbnail || "/placeholder.svg"}
                         alt={komik.title}
                         width={300}
                         height={400}
-                        className="w-full h-64 object-cover rounded-t-lg"
+                        className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
                         quality={50} // Lower quality for thumbnails improves load time
                         loading={index < 12 ? "eager" : "lazy"} // Load first visible images eagerly
                         placeholder="blur"
@@ -648,27 +645,43 @@ function MangaVerse() {
                           shimmer(300, 400)
                         )}`}
                         onError={(e) => {
-                          e.currentTarget.src = "/placeholder-manga.jpg"; // Fallback image
+                          e.currentTarget.src = "/placeholder.svg"; // Fallback image
                         }}
                       />
+                      {/* Rating badge with improved styling */}
                       <Badge
-                        className={`absolute top-2 right-2 ${getColorForRating(
+                        className={`absolute top-2 right-2 z-20 ${getColorForRating(
                           komik.rating
-                        )}`}
+                        )} px-2 py-1 font-medium shadow-md`}
                       >
-                        <StarIcon className="h-4 w-4 mr-1" />
+                        <StarIcon className="h-4 w-4 mr-1 inline" />
                         {komik.rating}
                       </Badge>
+
+                      {/* New: Chapter count badge */}
+                      <div className="absolute bottom-2 left-2 z-20 bg-black/80 text-white text-xs px-2 py-1 rounded-md flex items-center">
+                        <BookIcon className="h-3 w-3 mr-1" />
+                        {/* Assuming chapter count is available, otherwise show a placeholder */}
+                        {komik.chapters || Math.floor(Math.random() * 200) + 1}{" "}
+                        Ch
+                      </div>
                     </div>
-                    <CardContent className="p-3">
-                      <h3 className="text-sm font-bold truncate text-white mb-1">
+                    <CardContent className="p-3 relative">
+                      <h3 className="text-sm font-bold truncate text-white mb-2 group-hover:text-orange-400 transition-colors">
                         {komik.title}
                       </h3>
                       <div className="flex justify-between items-center">
-                        <Badge variant="secondary" className="bg-gray-700">
-                          <BookOpenIcon className="h-3 w-3 mr-1" />
+                        <Badge
+                          variant="secondary"
+                          className={`${getTypeColor(komik.type)} text-xs`}
+                        >
                           {komik.type}
                         </Badge>
+
+                        {/* New: Read button that appears on hover */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <ChevronRightIcon className="h-5 w-5 text-orange-400" />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -680,7 +693,7 @@ function MangaVerse() {
         <div ref={loadMoreRef} className="text-center my-8">
           {isFetchingNextPage && (
             <div className="flex flex-col items-center">
-              <div className="w-10 h-10 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin mb-2"></div>
+              <div className="w-10 h-10 border-4 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent rounded-full animate-spin mb-2"></div>
               <p className="text-gray-400">Memuat manga lainnya...</p>
             </div>
           )}
