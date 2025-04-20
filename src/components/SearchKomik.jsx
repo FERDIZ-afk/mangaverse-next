@@ -1,48 +1,52 @@
 "use client";
+
+import { useState } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { X } from "lucide-react";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-export default function SearchComponent() {
-  const [query, setQuery] = useState("");
+
+export default function SearchComponent({
+  initialQuery = "",
+  onSearch = null,
+  showButton = true,
+}) {
+  const [query, setQuery] = useState(initialQuery);
   const router = useRouter();
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (!query.trim()) return;
 
-    // Navigate to search results page with query parameter
-    router.push(`/search?q=${encodeURIComponent(query)}`);
+    if (onSearch) {
+      // If onSearch prop is provided, call it instead of navigating
+      onSearch(query);
+    } else {
+      // Navigate to search results page with query parameter
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+    }
   };
 
   return (
-    <div className="relative w-full max-w-lg mx-auto">
-      <form
-        onSubmit={handleSearch}
-        className="flex items-center border border-gray-700 rounded-lg overflow-hidden bg-gray-900"
-      >
+    <form onSubmit={handleSearch} className="flex items-center w-full">
+      <div className="relative flex-1 flex items-center bg-gray-800/80 rounded-l-md">
+        <Search size={18} className="absolute left-3 text-gray-400" />
         <Input
           type="text"
-          placeholder="Search manga..."
+          placeholder="Search manga, manhwa, manhua..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-900 text-white focus:outline-none"
+          className="flex-1 pl-10 pr-3 py-2 bg-transparent border-0 text-white focus:outline-none focus:ring-0"
         />
-        {query && (
-          <button
-            type="button"
-            className="p-2 text-gray-400 hover:text-white"
-            onClick={() => setQuery("")}
-          >
-            <X size={18} />
-          </button>
-        )}
-        <Button type="submit" className="px-4">
-          <Search size={18} />
+      </div>
+      {showButton && (
+        <Button
+          type="submit"
+          className="rounded-l-none bg-orange-600 hover:bg-orange-700 border-0 px-4 py-2 h-full"
+        >
+          Search
         </Button>
-      </form>
-    </div>
+      )}
+    </form>
   );
 }
