@@ -632,20 +632,26 @@ function MangaVerse() {
                   <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform duration-300 cursor-pointer h-full overflow-hidden group shadow-lg hover:shadow-xl">
                     <div className="relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      {/* // Improve the Image component error handling */}
                       <Image
                         src={komik.thumbnail || "/placeholder.svg"}
                         alt={komik.title}
                         width={300}
                         height={400}
                         className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
-                        quality={50} // Lower quality for thumbnails improves load time
-                        loading={index < 12 ? "eager" : "lazy"} // Load first visible images eagerly
+                        quality={50}
+                        loading={index < 12 ? "eager" : "lazy"}
                         placeholder="blur"
                         blurDataURL={`data:image/svg+xml;base64,${toBase64(
                           shimmer(300, 400)
                         )}`}
                         onError={(e) => {
-                          e.currentTarget.src = "/placeholder.svg"; // Fallback image
+                          // Set this to prevent endless retry loops
+                          if (
+                            !e.currentTarget.src.includes("/placeholder.svg")
+                          ) {
+                            e.currentTarget.src = "/placeholder.svg";
+                          }
                         }}
                       />
                       {/* Rating badge with improved styling */}
@@ -657,7 +663,6 @@ function MangaVerse() {
                         <StarIcon className="h-4 w-4 mr-1 inline" />
                         {komik.rating}
                       </Badge>
-
                       {/* New: Chapter count badge */}
                       <div className="absolute bottom-2 left-2 z-20 bg-black/80 text-white text-xs px-2 py-1 rounded-md flex items-center">
                         <BookIcon className="h-3 w-3 mr-1" />

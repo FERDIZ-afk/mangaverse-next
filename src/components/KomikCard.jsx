@@ -6,7 +6,7 @@ export default function MangaCard({ manga }) {
       <div className="bg-gray-800 rounded-lg overflow-hidden hover:scale-105 transition-transform duration-300 shadow-lg h-full flex flex-col cursor-pointer">
         <div className="relative w-full h-[220px]">
           <img
-            src={manga.thumbnail || "/placeholder.jpg"}
+            src={manga.thumbnail || "/placeholder.svg"}
             alt={manga.title || "Unknown Title"}
             className="w-full h-full object-cover"
             loading="lazy"
