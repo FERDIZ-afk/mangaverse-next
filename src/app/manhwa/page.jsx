@@ -1,45 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Book } from "lucide-react";
+import { useState } from "react";
+import { BookIcon } from "lucide-react";
 import PageTitle from "@/components/PageTitle";
+import ComicCard from "@/components/ComicCard";
+import StatusNotice from "@/components/StatusNotice";
+import ErrorDisplay from "@/components/ErrorDisplay";
+import LoadingIndicator from "@/components/LoadingIndicator";
+import useComicFetch from "@/hooks/useComicFetch";
 
 export default function ManhwaPage() {
-  const [manhwaList, setmanhwaList] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isRefetching, setIsRefetching] = useState(false);
 
-  useEffect(() => {
-    fetchmanhwa();
-  }, []);
+  const {
+    comicList,
+    loading,
+    error,
+    hasMore,
+    loadMoreRef,
+    offlineMode,
+    showFallbackNotice,
+    refetch,
+  } = useComicFetch("manhwa");
 
-  const fetchmanhwa = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/proxy?type=manhwa");
-      const data = await response.json();
-
-      //   console.log("API Response:", data);
-
-      if (data.success && data.data) {
-        // Map param to slug for consistency
-        const validmanhwa = data.data.map((item) => ({
-          ...item,
-          slug: item.param || item.id?.toString(), // Use param as slug
-        }));
-
-        console.log("Processed manhwa Data:", validmanhwa);
-        setmanhwaList(validmanhwa);
-      } else {
-        throw new Error(data.message || "Failed to fetch manhwa");
-      }
-    } catch (error) {
-      setError("Gagal memuat data manhwa");
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefetch = async () => {
+    setIsRefetching(true);
+    await refetch();
+    setIsRefetching(false);
   };
 
   return (
@@ -47,68 +34,58 @@ export default function ManhwaPage() {
       <div className="container mx-auto px-4">
         <PageTitle
           title="Manhwa"
-          icon={<Book className="h-6 w-6 text-purple-500" />}
+          icon={<BookIcon className="h-6 w-6 text-purple-500" />}
         />
 
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="w-16 h-16 border-4 border-t-purple-500 border-r-transparent border-b-purple-500 border-l-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-10 bg-red-500/10 rounded-lg">
-            <p className="text-red-400">{error}</p>
-          </div>
+        <StatusNotice
+          offlineMode={offlineMode}
+          showFallbackNotice={showFallbackNotice}
+        />
+
+        {error ? (
+          <ErrorDisplay
+            error={error}
+            refetch={handleRefetch}
+            isRefetching={isRefetching}
+          />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {manhwaList.map((manhwa, index) => (
-              <ManhwaCard key={index} manhwa={manhwa} />
-            ))}
-          </div>
+          <>
+            {loading && comicList.length === 0 ? (
+              <LoadingIndicator initial={true} />
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                  {comicList.map((manhwa, index) => (
+                    <ComicCard
+                      key={`${manhwa.slug}-${index}`}
+                      comic={manhwa}
+                      type="manhwa"
+                    />
+                  ))}
+                </div>
+
+                {/* Loading indicator for infinite scroll */}
+                {loading && comicList.length > 0 && <LoadingIndicator />}
+
+                {/* Reference element for intersection observer */}
+                {hasMore && (
+                  <div
+                    ref={loadMoreRef}
+                    className="h-10 w-full"
+                    aria-hidden="true"
+                  ></div>
+                )}
+
+                {!hasMore && comicList.length > 0 && (
+                  <p className="text-center text-gray-400 mt-8">
+                    Anda telah mencapai akhir halaman!
+                  </p>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
-  );
-}
-
-function ManhwaCard({ manhwa }) {
-  // For debugging
-  console.log("Data manhwa:", manhwa);
-
-  return (
-    <Link href={`/manhwa/${manhwa.slug}`}>
-      <div className="bg-gray-800 rounded-lg overflow-hidden hover:scale-105 transition-transform duration-300 shadow-lg h-[320px] flex flex-col cursor-pointer">
-        <div className="relative w-full h-[220px]">
-          <img
-            src={manhwa.thumbnail || "/placeholder.jpg"}
-            alt={manhwa.title || "Unknown Title"}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-          <div className="absolute top-2 right-2 bg-black/70 text-yellow-400 text-xs px-2 py-1 rounded-full">
-            {manhwa.rating || "N/A"}
-          </div>
-          {manhwa.status && (
-            <div className="absolute bottom-2 left-2 bg-black/70 text-xs px-2 py-1 rounded-full text-gray-200">
-              {manhwa.status}
-            </div>
-          )}
-        </div>
-        <div className="p-3 flex-1 flex flex-col justify-between">
-          <h3 className="font-semibold text-sm line-clamp-2 text-gray-100 mb-2">
-            {manhwa.title || "Unknown Title"}
-          </h3>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">
-              {manhwa.type || "manhwa"}
-            </span>
-            {manhwa.latest_chapter && (
-              <span className="text-xs text-purple-400">
-                Ch. {manhwa.latest_chapter}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
