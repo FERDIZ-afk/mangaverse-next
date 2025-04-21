@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useInView } from "react-intersection-observer";
@@ -20,6 +20,7 @@ import {
   ChevronRightIcon,
   FlameIcon as FireIcon,
 } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual"; // Tambahkan dependency baru ini
 
 // Create a client with improved caching strategy
 const queryClient = new QueryClient({
@@ -29,8 +30,8 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         // Don't retry if we got a 4xx response
         if (error?.status >= 400 && error?.status < 500) return false;
-        // Otherwise retry up to 3 times
-        return failureCount < 3;
+        // Otherwise retry up to 2 times (reduced from 3)
+        return failureCount < 2;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       staleTime: 10 * 60 * 1000, // 10 minutes
@@ -41,6 +42,10 @@ const queryClient = new QueryClient({
 
 // Local storage helpers for offline support
 const CACHE_KEY_PREFIX = "mangaverse_cache_";
+
+// Tambahkan cache untuk gambar
+const IMAGE_CACHE_PREFIX = "mangaverse_img_";
+const IMAGE_CACHE_SIZE = 100; // Batasi jumlah gambar yang di-cache
 
 function saveToLocalCache(key, data) {
   try {
@@ -78,6 +83,60 @@ function getFromLocalCache(key, maxAge = 60 * 60 * 1000) {
   }
 }
 
+// Image cache management
+function getImageCacheKey(url) {
+  return `${IMAGE_CACHE_PREFIX}${btoa(url.substring(0, 100))}`;
+}
+
+function saveImageToCache(url, status) {
+  try {
+    // Get existing cache entries
+    const cacheIndex =
+      localStorage.getItem(`${IMAGE_CACHE_PREFIX}_index`) || "[]";
+    const index = JSON.parse(cacheIndex);
+
+    // Add new entry
+    const entry = { url, status, timestamp: Date.now() };
+    localStorage.setItem(getImageCacheKey(url), JSON.stringify(entry));
+
+    // Update index
+    if (!index.includes(url)) {
+      index.push(url);
+      // If cache is full, remove oldest entry
+      if (index.length > IMAGE_CACHE_SIZE) {
+        const oldestUrl = index.shift();
+        localStorage.removeItem(getImageCacheKey(oldestUrl));
+      }
+      localStorage.setItem(
+        `${IMAGE_CACHE_PREFIX}_index`,
+        JSON.stringify(index)
+      );
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Failed to cache image status:", err);
+    return false;
+  }
+}
+
+function getImageCacheStatus(url) {
+  try {
+    const cached = localStorage.getItem(getImageCacheKey(url));
+    if (!cached) return null;
+
+    const entry = JSON.parse(cached);
+    // Cache valid for 24 hours
+    if (Date.now() - entry.timestamp > 24 * 60 * 60 * 1000) {
+      return null;
+    }
+
+    return entry.status;
+  } catch (err) {
+    return null;
+  }
+}
+
 // Wrapper component
 export default function MangaVerseWrapper() {
   return (
@@ -97,25 +156,135 @@ function MangaVerse() {
   const [offlineMode, setOfflineMode] = useState(false);
   const [prefetchedNextPage, setPrefetchedNextPage] = useState(false);
 
+  // Ref for virtualized container
+  const containerRef = useRef(null);
+
+  // State for image loading
+  const [loadedImages, setLoadedImages] = useState({});
+  const [failedImages, setFailedImages] = useState({});
+
   // Ref to track network status
   const networkStatusRef = useRef({
     isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
     lastOnlineCheck: Date.now(),
   });
 
-  // Intersection observer for infinite loading with higher threshold
+  // Intersection observer untuk loading berikutnya - dengan threshold dinaikan
   const { ref: loadMoreRef, inView } = useInView({
-    threshold: 0.3, // Increased threshold for earlier loading
-    rootMargin: "400px", // Start loading earlier
+    threshold: 0.5, // Increased threshold for later loading
+    rootMargin: "300px", // Reduced to prevent too early loading
     triggerOnce: false,
   });
 
-  // Prefetch observer for next page (farther ahead)
+  // Intersection observer untuk prefetching - jarak lebih jauh
   const { ref: prefetchRef, inView: shouldPrefetch } = useInView({
     threshold: 0,
-    rootMargin: "800px", // Even farther ahead for prefetching
+    rootMargin: "600px", // Reduced from 800px
     triggerOnce: false,
   });
+
+  // Throttle untuk image loading requests
+  const imageLoadingQueue = useRef({
+    queue: [],
+    processing: false,
+  });
+
+  // Process image loading queue with throttling
+  const processImageQueue = useCallback(() => {
+    if (
+      imageLoadingQueue.current.processing ||
+      imageLoadingQueue.current.queue.length === 0
+    ) {
+      return;
+    }
+
+    imageLoadingQueue.current.processing = true;
+
+    // Process up to 5 images at a time
+    const batch = imageLoadingQueue.current.queue.splice(0, 5);
+    Promise.all(
+      batch.map((url) => {
+        return new Promise((resolve) => {
+          // Use document.createElement instead of new Image()
+          const img = document.createElement("img");
+
+          img.onload = () => {
+            setLoadedImages((prev) => ({ ...prev, [url]: true }));
+            saveImageToCache(url, "success");
+            resolve();
+          };
+
+          img.onerror = () => {
+            // For production 402 errors, you might want to try direct URL
+            if (url.includes("/_next/image")) {
+              // Try direct URL as fallback
+              const directUrl = new URL(url).searchParams.get("url");
+              if (directUrl) {
+                const directImg = document.createElement("img");
+                directImg.onload = () => {
+                  setLoadedImages((prev) => ({ ...prev, [url]: true }));
+                  saveImageToCache(url, "success");
+                  resolve();
+                };
+                directImg.onerror = () => {
+                  setFailedImages((prev) => ({ ...prev, [url]: true }));
+                  saveImageToCache(url, "failed");
+                  resolve();
+                };
+                directImg.src = decodeURIComponent(directUrl);
+                return;
+              }
+            }
+
+            setFailedImages((prev) => ({ ...prev, [url]: true }));
+            saveImageToCache(url, "failed");
+            resolve();
+          };
+
+          img.src = url;
+        });
+      })
+    ).then(() => {
+      imageLoadingQueue.current.processing = false;
+      // Continue processing queue
+      if (imageLoadingQueue.current.queue.length > 0) {
+        setTimeout(processImageQueue, 100); // Small delay between batches
+      }
+    });
+  }, []);
+
+  // Add image to loading queue
+  const queueImageForLoading = useCallback(
+    (url) => {
+      if (
+        !url ||
+        url === "/placeholder.svg" ||
+        loadedImages[url] ||
+        failedImages[url]
+      ) {
+        return;
+      }
+
+      // Check image cache status first
+      const cacheStatus = getImageCacheStatus(url);
+      if (cacheStatus === "success") {
+        setLoadedImages((prev) => ({ ...prev, [url]: true }));
+        return;
+      } else if (cacheStatus === "failed") {
+        setFailedImages((prev) => ({ ...prev, [url]: true }));
+        return;
+      }
+
+      // Add to queue if not in cache
+      if (!imageLoadingQueue.current.queue.includes(url)) {
+        imageLoadingQueue.current.queue.push(url);
+        if (!imageLoadingQueue.current.processing) {
+          processImageQueue();
+        }
+      }
+    },
+    [loadedImages, failedImages, processImageQueue]
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -311,10 +480,10 @@ function MangaVerse() {
         if (error?.status >= 400 && error?.status < 500) return false;
         if (!navigator.onLine && error.message.includes("offline"))
           return false;
-        // Retry up to 3 times for server errors
-        return failureCount < 3;
+        // Retry up to 2 times for server errors (reduced from 3)
+        return failureCount < 2;
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000), // Reduced max delay
       // Improved stale time and cache time for this specific query
       staleTime: 10 * 60 * 1000, // 10 minutes
       cacheTime: 60 * 60 * 1000, // 1 hour
@@ -337,11 +506,12 @@ function MangaVerse() {
   // Load more when scrolling to the bottom
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
+      console.log("Triggering fetchNextPage");
       fetchNextPage();
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Prefetch next page in advance
+  // Prefetch next page in advance - dengan throttling tambahan
   useEffect(() => {
     if (
       shouldPrefetch &&
@@ -357,12 +527,16 @@ function MangaVerse() {
         // Mark as prefetched to avoid multiple prefetches
         setPrefetchedNextPage(true);
 
-        // Use queryClient directly to prefetch
-        queryClient.prefetchInfiniteQuery(
-          ["komiks", debouncedQuery, typeFilter],
-          () => fetchKomiksPage({ pageParam: nextPageToFetch }),
-          { staleTime: 2 * 60 * 1000 } // 2 minutes
-        );
+        // Use queryClient directly to prefetch with debouncing
+        const prefetchTimer = setTimeout(() => {
+          queryClient.prefetchInfiniteQuery(
+            ["komiks", debouncedQuery, typeFilter],
+            () => fetchKomiksPage({ pageParam: nextPageToFetch }),
+            { staleTime: 2 * 60 * 1000 } // 2 minutes
+          );
+        }, 500); // Add small delay to prevent burst of requests
+
+        return () => clearTimeout(prefetchTimer);
       }
     }
   }, [
@@ -401,13 +575,46 @@ function MangaVerse() {
   };
 
   // Filter komiks based on type - moved out of render for better performance
-  const filteredKomiks =
-    data?.pages.flatMap(
-      (page) =>
-        page.data?.filter(
-          (komik) => typeFilter === "All" || komik.type === typeFilter
-        ) || []
-    ) || [];
+  const filteredKomiks = useMemo(() => {
+    return (
+      data?.pages.flatMap(
+        (page) =>
+          page.data?.filter(
+            (komik) => typeFilter === "All" || komik.type === typeFilter
+          ) || []
+      ) || []
+    );
+  }, [data?.pages, typeFilter]);
+
+  // Virtualization setup
+  const rowVirtualizer = useVirtualizer({
+    count: Math.ceil(filteredKomiks.length / 3), // Assuming 3 items per row on mobile
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 320, // Estimated row height
+    overscan: 5, // Show 5 rows before and after visible area
+  });
+
+  // Preload images when they're about to come into view
+  useEffect(() => {
+    // Get items that are in view or about to be in view
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    if (!virtualItems.length) return;
+
+    // Calculate the range of items to preload
+    const startIndex = Math.max(0, virtualItems[0].index * 3);
+    const endIndex = Math.min(
+      filteredKomiks.length,
+      (virtualItems[virtualItems.length - 1].index + 1) * 3
+    );
+
+    // Queue these images for loading
+    for (let i = startIndex; i < endIndex; i++) {
+      const komik = filteredKomiks[i];
+      if (komik?.thumbnail) {
+        queueImageForLoading(komik.thumbnail);
+      }
+    }
+  }, [rowVirtualizer.getVirtualItems(), filteredKomiks, queueImageForLoading]);
 
   const getColorForRating = (rating) => {
     const parsedRating = Number.parseFloat(rating);
@@ -440,6 +647,31 @@ function MangaVerse() {
     typeof window === "undefined"
       ? Buffer.from(str).toString("base64")
       : window.btoa(str);
+
+  // Helper untuk menentukan apakah gambar harus ditampilkan
+  const shouldShowRealImage = useCallback(
+    (thumbnail) => {
+      if (!thumbnail) return false;
+
+      // Check if image has failed previously
+      if (failedImages[thumbnail]) return false;
+
+      // Check if image is already loaded
+      if (loadedImages[thumbnail]) return true;
+
+      // Check cache status
+      const cacheStatus = getImageCacheStatus(thumbnail);
+      if (cacheStatus === "failed") return false;
+      if (cacheStatus === "success") return true;
+
+      // Queue image for loading if not in cache
+      queueImageForLoading(thumbnail);
+
+      // Show placeholder while loading
+      return false;
+    },
+    [failedImages, loadedImages, queueImageForLoading]
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
@@ -523,27 +755,8 @@ function MangaVerse() {
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
                 {/* Search input commented out as in original code */}
-                {/* <Input */}
-                {/* type="text" */}
-                {/* placeholder="Search manga..." */}
-                {/* value={searchQuery} */}
-                {/* onChange={handleSearch} */}
-                {/* className="bg-gray-800 border-gray-700 pl-9" */}
-                {/* /> */}
-                {/* <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" /> */}
               </div>
               {/* Select component commented out as in original code */}
-              {/* <Select value={selectedType} onValueChange={handleTypeChange}>
-                <SelectTrigger className="w-full sm:w-32 bg-gray-800 border-gray-700">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="manga">Manga</SelectItem>
-                  <SelectItem value="manhwa">Manhwa</SelectItem>
-                  <SelectItem value="manhua">Manhua</SelectItem>
-                </SelectContent>
-              </Select> */}
             </div>
           </div>
         </header>
@@ -626,34 +839,44 @@ function MangaVerse() {
                 ))
             : filteredKomiks.map((komik, index) => (
                 <Link
-                  href={`/manga/${komik.param}`}
-                  key={`${komik.param}-${index}`}
+                  href={`/manga/${komik.param || komik.slug}`}
+                  key={`${komik.param || komik.slug}-${index}`}
                 >
                   <Card className="bg-gray-800 border-gray-700 hover:scale-105 transition-transform duration-300 cursor-pointer h-full overflow-hidden group shadow-lg hover:shadow-xl">
                     <div className="relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      {/* // Improve the Image component error handling */}
-                      <Image
-                        src={komik.thumbnail || "/placeholder.svg"}
-                        alt={komik.title}
-                        width={300}
-                        height={400}
-                        className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
-                        quality={50}
-                        loading={index < 12 ? "eager" : "lazy"}
-                        placeholder="blur"
-                        blurDataURL={`data:image/svg+xml;base64,${toBase64(
-                          shimmer(300, 400)
-                        )}`}
-                        onError={(e) => {
-                          // Set this to prevent endless retry loops
-                          if (
-                            !e.currentTarget.src.includes("/placeholder.svg")
-                          ) {
-                            e.currentTarget.src = "/placeholder.svg";
-                          }
-                        }}
-                      />
+
+                      {shouldShowRealImage(komik.thumbnail) ? (
+                        <Image
+                          src={komik.thumbnail}
+                          alt={komik.title}
+                          width={300}
+                          height={400}
+                          className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110"
+                          quality={50}
+                          loading={index < 12 ? "eager" : "lazy"}
+                          placeholder="empty"
+                          onLoad={() => {
+                            setLoadedImages((prev) => ({
+                              ...prev,
+                              [komik.thumbnail]: true,
+                            }));
+                            saveImageToCache(komik.thumbnail, "success");
+                          }}
+                          onError={() => {
+                            setFailedImages((prev) => ({
+                              ...prev,
+                              [komik.thumbnail]: true,
+                            }));
+                            saveImageToCache(komik.thumbnail, "failed");
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-64 bg-gray-700 flex items-center justify-center">
+                          <BookIcon className="w-12 h-12 text-gray-500" />
+                        </div>
+                      )}
+
                       {/* Rating badge with improved styling */}
                       <Badge
                         className={`absolute top-2 right-2 z-20 ${getColorForRating(
@@ -663,14 +886,17 @@ function MangaVerse() {
                         <StarIcon className="h-4 w-4 mr-1 inline" />
                         {komik.rating}
                       </Badge>
-                      {/* New: Chapter count badge */}
+
+                      {/* Chapter count badge */}
                       <div className="absolute bottom-2 left-2 z-20 bg-black/80 text-white text-xs px-2 py-1 rounded-md flex items-center">
                         <BookIcon className="h-3 w-3 mr-1" />
-                        {/* Assuming chapter count is available, otherwise show a placeholder */}
-                        {komik.chapters || Math.floor(Math.random() * 200) + 1}{" "}
-                        Ch
+                        {komik.total_chapter ||
+                          komik.chapter_count ||
+                          komik.total_chapters}
+                        Ch ?
                       </div>
                     </div>
+
                     <CardContent className="p-3 relative">
                       <h3 className="text-sm font-bold truncate text-white mb-2 group-hover:text-orange-400 transition-colors">
                         {komik.title}
@@ -683,7 +909,7 @@ function MangaVerse() {
                           {komik.type}
                         </Badge>
 
-                        {/* New: Read button that appears on hover */}
+                        {/* Read button that appears on hover */}
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <ChevronRightIcon className="h-5 w-5 text-orange-400" />
                         </div>
